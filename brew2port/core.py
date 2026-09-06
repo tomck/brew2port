@@ -26,12 +26,13 @@ def load_ports(path):
             name=line.split()[0]; rows.append({'name':name,'description':line[len(name):].strip()})
     return rows
 
-def fetch_macports_ports(url='https://ports.macports.org/api/v1/ports/', opener=urllib.request.urlopen):
+def fetch_macports_ports(url='https://ports.macports.org/api/v1/ports/', opener=urllib.request.urlopen, progress=None):
     """Fetch the public MacPorts port catalog, following API pagination."""
     rows=[]; next_url=url; pages=0
     while next_url:
         pages += 1
         if pages > 5000: raise RuntimeError('MacPorts API pagination exceeded safety limit')
+        if progress: progress(f'Fetching MacPorts catalog page {pages}...')
         request=urllib.request.Request(next_url,headers={'User-Agent':'brew2port/'+__import__('brew2port').__version__})
         with opener(request) as response: payload=json.loads(response.read().decode())
         if isinstance(payload,list): page=payload; next_url=None
@@ -45,11 +46,15 @@ def fetch_macports_ports(url='https://ports.macports.org/api/v1/ports/', opener=
                 if name: rows.append({**port,'name':name})
     return rows
 
-def cached_macports_ports(cache_path, refresh=False, url='https://ports.macports.org/api/v1/ports/'):
+def cached_macports_ports(cache_path, refresh=False, url='https://ports.macports.org/api/v1/ports/', progress=None):
     path=Path(cache_path).expanduser()
-    if path.exists() and not refresh: return load_ports(path)
-    rows=fetch_macports_ports(url)
+    if path.exists() and not refresh:
+        if progress: progress(f'Using cached MacPorts catalog: {path}')
+        return load_ports(path)
+    if progress: progress('No usable cached MacPorts catalog found; downloading a fresh copy...')
+    rows=fetch_macports_ports(url,progress=progress)
     path.parent.mkdir(parents=True,exist_ok=True); path.write_text(json.dumps(rows,indent=2)+'\n')
+    if progress: progress(f'Cached {len(rows)} MacPorts ports at {path}')
     return rows
 
 def candidates(item, ports, overrides=None):

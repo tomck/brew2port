@@ -1,4 +1,4 @@
-import argparse,json,urllib.request,logging
+import argparse,json,urllib.request,logging,sys
 from .core import *
 from .macports import setup_macports
 def main():
@@ -43,13 +43,20 @@ Homebrew packages are never removed automatically.
  elif x.cmd=='setup-macports':
   data=setup_macports(x.version,x.dry_run,x.skip_update,x.yes); out=json.dumps(data,indent=2)
  elif x.cmd=='plan':
+  print('Loading Homebrew inventory...',file=sys.stderr)
   items=json.load(open(x.inventory))
   if x.overrides:
    try: ov=json.load(open(x.overrides))
    except FileNotFoundError: p.error(f"overrides file not found: {x.overrides} (omit --overrides or use an absolute path)")
   else: ov={}
-  ports=load_ports(x.ports) if x.ports else cached_macports_ports(x.cache,x.refresh_ports,x.ports_url)
-  data=make_plan(items,ports,ov); out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
+  if x.ports:
+   print(f'Loading local MacPorts catalog: {x.ports}',file=sys.stderr); ports=load_ports(x.ports)
+  else:
+   ports=cached_macports_ports(x.cache,x.refresh_ports,x.ports_url,progress=lambda message: print(message,file=sys.stderr))
+  print(f'Matching {len(items)} Homebrew packages against {len(ports)} MacPorts ports...',file=sys.stderr)
+  data=make_plan(items,ports,ov)
+  print(f'Generated migration plan for {len(data)} packages.',file=sys.stderr)
+  out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
  elif x.cmd=='migrate':
   data=install(json.load(open(x.plan)),x.yes if x.install else False); out=json.dumps(data,indent=2)
   if not x.install: out += "\n\nDry run complete. No packages were changed.\n\nTo perform the reviewed installation:\n  brew2port migrate --plan " + x.plan + " --install\n"
