@@ -2,7 +2,7 @@ import argparse,json,urllib.request,logging,sys,subprocess,shutil
 from .core import *
 from .macports import setup_macports
 def main():
- p=argparse.ArgumentParser(prog='brew2port'); s=p.add_subparsers(dest='cmd')
+ p=argparse.ArgumentParser(prog='brew2port'); p.add_argument('--update-macports',action='store_true',dest='update_macports_global'); s=p.add_subparsers(dest='cmd')
  a=s.add_parser('inventory'); a.add_argument('-o','--output');
  a=s.add_parser('build-index'); a.add_argument('-o','--output',required=True); a.add_argument('--url',default='https://ports.macports.org/api/v1/ports/')
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
@@ -11,6 +11,8 @@ def main():
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
  x=p.parse_args()
+ if x.cmd is None and x.update_macports_global:
+  print(json.dumps(update_macports(),indent=2)); return
  if x.cmd is None:
   print("""brew2port — Homebrew to MacPorts migration assistant
 
