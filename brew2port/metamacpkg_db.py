@@ -15,6 +15,8 @@ Rules:
   * catalog row `needs-review` or no row -> existing local matching.
 """
 import csv
+import hashlib
+import urllib.request
 from pathlib import Path
 
 CONFIDENT_MIN = 0.9
@@ -41,10 +43,25 @@ def catalog_paths(catalog_dir):
             "cask": d / "brew-cask-to-macports.csv"}
 
 
+def ensure_local(source):
+    """A mappings directory as-is; an http(s)/file URL base is downloaded
+    to a content-addressed cache first (published snapshot support)."""
+    if source.startswith(("http://", "https://", "file://")):
+        cache = (Path.home() / ".cache" / "brew2port" / "metamacpkg" /
+                 hashlib.sha1(source.encode()).hexdigest()[:12])
+        cache.mkdir(parents=True, exist_ok=True)
+        for name in ("brew-formula-to-macports.csv",
+                     "brew-cask-to-macports.csv"):
+            urllib.request.urlretrieve(source.rstrip("/") + "/" + name,
+                                       cache / name)
+        return str(cache)
+    return source
+
+
 def load(catalog_dir):
     """Load both mapping CSVs; missing files yield empty tables."""
     tables = {}
-    for kind, path in catalog_paths(catalog_dir).items():
+    for kind, path in catalog_paths(ensure_local(catalog_dir)).items():
         rows = {}
         if path.exists():
             with open(path, newline="") as f:
@@ -72,5 +89,6 @@ def lookup(catalog, kind, name, port_names):
             return None  # stale catalog entry; do not trust blindly
         return [{"port": row["target"],
                  "confidence": float(row["confidence"]),
-                 "reason": f"metamacpkg:{row.get('method', 'catalog')}"}]
+                 "reason": f"metamacpkg:{row.get('method', 'catalog')}",
+                 "catalog_version": row.get("catalog_version", "")}]
     return None

@@ -97,7 +97,7 @@ Homebrew packages are never removed automatically.
   cat=__import__('brew2port.metamacpkg_db',fromlist=['load']).load(x.catalog) if x.catalog else None
   data=make_plan(items,ports,ov,cat)
   print(f'Generated migration plan for {len(data)} packages.',file=sys.stderr)
-  out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
+  out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']}, {c['reason']})" for c in r['candidates']) or 'NO MATCH') for r in data)
  elif x.cmd=='migrate':
   install_now=x.install
   if x.install and not x.yes:

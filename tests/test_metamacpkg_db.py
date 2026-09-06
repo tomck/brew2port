@@ -83,6 +83,25 @@ class TestCatalog(unittest.TestCase):
         cs = candidates({"name": "gtk+3", "kind": "formula"}, self.ports)
         self.assertTrue(cs)
 
+    def test_url_source_and_version(self):
+        import tempfile
+        from pathlib import Path as P
+        from brew2port import metamacpkg_db as mdb
+        tmp = tempfile.TemporaryDirectory()
+        (P(tmp.name) / "brew-formula-to-macports.csv").write_text(
+            "source,target,confidence,method,status,evidence,alternatives,"
+            "catalog_version\n"
+            "gtk+3,gtk3,0.96,normalized,confident,fold,,v20260906+abc123\n")
+        (P(tmp.name) / "brew-cask-to-macports.csv").write_text(
+            "source,target,confidence,method,status,evidence,alternatives,"
+            "catalog_version\n")
+        cat = mdb.load("file://" + tmp.name)
+        cs = candidates({"name": "gtk+3", "kind": "formula"},
+                        [{"name": "gtk3"}], catalog=cat)
+        self.assertEqual(cs[0]["port"], "gtk3")
+        self.assertEqual(cs[0]["catalog_version"], "v20260906+abc123")
+        tmp.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()
