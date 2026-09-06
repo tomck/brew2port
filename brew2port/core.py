@@ -60,9 +60,10 @@ def cached_macports_ports(cache_path, refresh=False, url='https://ports.macports
 
 def local_macports_ports(run=subprocess.run):
     """Read port names from MacPorts' already-maintained local PortIndex."""
-    if not shutil.which('port'):
+    port=shutil.which('port') or ('/opt/local/bin/port' if Path('/opt/local/bin/port').exists() else None)
+    if not port:
         raise RuntimeError('MacPorts is not installed')
-    result=run(['port','-q','echo','all'],capture_output=True,text=True)
+    result=run([port,'-q','echo','all'],capture_output=True,text=True)
     if result.returncode != 0: raise RuntimeError('Unable to read the local MacPorts PortIndex')
     names=[]
     for line in result.stdout.splitlines():
