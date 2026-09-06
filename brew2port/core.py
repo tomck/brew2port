@@ -80,9 +80,15 @@ def update_macports(run=subprocess.run):
     if result.returncode != 0: raise RuntimeError(f'MacPorts selfupdate failed with exit code {result.returncode}')
     return {'status':'updated','command':['sudo',port,'selfupdate']}
 
-def candidates(item, ports, overrides=None):
+def candidates(item, ports, overrides=None, catalog=None):
     overrides=overrides or {}; name=item['name']
     if name in overrides: return [dict(overrides[name],port=overrides[name].get('port'))] if overrides[name] else []
+    cat_row=None
+    if catalog is not None:
+        from . import metamacpkg_db as mdb
+        hit=mdb.lookup(catalog, item.get('kind','formula'), name, {p.get('name') or p.get('port') for p in ports})
+        if hit is not None: return hit
+        cat_row=mdb.get_row(catalog, item.get('kind','formula'), name)
     scored=[]
     for p in ports:
         pn=p.get('name') or p.get('port'); aliases=' '.join(str(p.get(k,'')) for k in ('aliases','provides','replaces','conflicts'))
@@ -92,10 +98,14 @@ def candidates(item, ports, overrides=None):
         elif norm(name) in [norm(a) for a in re.split(r'[,\s]+',aliases) if a]: score,reason=.92,'alias/provides/replaces'
         else: score=difflib.SequenceMatcher(None,norm(name),norm(pn)).ratio()
         if score>=.55: scored.append({'port':pn,'confidence':round(score,3),'reason':reason})
-    return sorted(scored,key=lambda x:x['confidence'],reverse=True)[:5]
+    out=sorted(scored,key=lambda x:x['confidence'],reverse=True)[:5]
+    if cat_row is not None and cat_row.get('status')=='needs-review':
+        from .metamacpkg_db import filter_review
+        out=filter_review(out)
+    return out
 
-def make_plan(items,ports,overrides=None):
-    return [{'kind':i['kind'],'homebrew':i['name'],'candidates':candidates(i,ports,overrides)} for i in items]
+def make_plan(items,ports,overrides=None,catalog=None):
+    return [{'kind':i['kind'],'homebrew':i['name'],'candidates':candidates(i,ports,overrides,catalog)} for i in items]
 
 def write_preview_csv(plan, path):
     with open(path,'w',newline='') as output:

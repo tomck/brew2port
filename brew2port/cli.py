@@ -7,8 +7,8 @@ def main():
  a=s.add_parser('build-index'); a.add_argument('-o','--output',required=True); a.add_argument('--url',default='https://ports.macports.org/api/v1/ports/')
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  s.add_parser('update-macports')
- a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
- a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
+ a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('--catalog',default=None,help='metamacpkg mappings dir (this branch only)')
+ a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json'); a.add_argument('--catalog',default=None,help='metamacpkg mappings dir (this branch only)')
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
  x=p.parse_args()
@@ -71,7 +71,8 @@ Homebrew packages are never removed automatically.
   ov=json.load(open(x.overrides)) if x.overrides else {}
   print('Reading the local MacPorts PortIndex...',file=sys.stderr)
   ports=local_macports_ports(); print(f'Matching {len(items)} Homebrew packages against {len(ports)} MacPorts ports...',file=sys.stderr)
-  data=make_plan(items,ports,ov); open(x.plan_output,'w').write(json.dumps(data,indent=2)+'\n'); write_preview_csv(data,x.preview_output)
+  cat=__import__('brew2port.metamacpkg_db',fromlist=['load']).load(x.catalog) if x.catalog else None
+  data=make_plan(items,ports,ov,cat); open(x.plan_output,'w').write(json.dumps(data,indent=2)+'\n'); write_preview_csv(data,x.preview_output)
   print(f'Wrote migration plan to {x.plan_output} and review CSV to {x.preview_output}.',file=sys.stderr)
   out='Preparation complete. Review '+x.preview_output+' before installing anything.\n\nTo apply the reviewed migration:\n  brew2port migrate --plan '+x.plan_output+' --install\n'
  elif x.cmd=='plan':
@@ -93,7 +94,8 @@ Homebrew packages are never removed automatically.
   else:
    ports=cached_macports_ports(x.cache,x.refresh_ports,x.ports_url,progress=lambda message: print(message,file=sys.stderr))
   print(f'Matching {len(items)} Homebrew packages against {len(ports)} MacPorts ports...',file=sys.stderr)
-  data=make_plan(items,ports,ov)
+  cat=__import__('brew2port.metamacpkg_db',fromlist=['load']).load(x.catalog) if x.catalog else None
+  data=make_plan(items,ports,ov,cat)
   print(f'Generated migration plan for {len(data)} packages.',file=sys.stderr)
   out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
  elif x.cmd=='migrate':
