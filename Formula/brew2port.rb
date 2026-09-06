@@ -3,7 +3,7 @@ class Brew2port < Formula
   desc "Safe Homebrew to MacPorts migration planner"
   homepage "https://github.com/tomck/brew2port"
   url "https://github.com/tomck/homebrew-brew2port/archive/refs/tags/v0.1.1.tar.gz"
-  sha256 "686e700d86fc4bf78fc98976773365498902ef1cd6ee83da7ae47d110a7c67ce"
+  sha256 "bbbf66a1ac2b1a6057baaff3b53f72c2656d87a643875f1fb4b80b532ad93073"
   license "MIT"
   depends_on "python@3.14"
 
