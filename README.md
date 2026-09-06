@@ -22,7 +22,7 @@ Without `--install`, `migrate` is a dry run. `--yes` is required for unattended 
 
 ## Mapping data
 
-`plan` automatically downloads the public MacPorts catalog from its read-only API and caches it at `~/.cache/brew2port/macports-ports.json`. Use `--refresh-ports` to update it, or `--ports FILE` for a local snapshot. `build-index --output FILE` explicitly saves a fresh catalog. A port index can be JSON (an array of objects with `name`, `description`, `homepage`, `provides`, `replaces`, `conflicts`, or `aliases`), TSV/CSV, or the line-oriented output of `port search --index`. The optional `--overrides FILE` flag accepts a curated override file when needed.
+`plan` uses the local MacPorts `PortIndex` automatically when `port` is installed, so it does not download the entire catalog. Add `--update-macports` when you want brew2port to run `sudo port selfupdate` first. On machines without MacPorts, it downloads the public MacPorts catalog from its read-only API and caches it at `~/.cache/brew2port/macports-ports.json`. Use `--refresh-ports` to update that web cache, or `--ports FILE` for a local snapshot. `build-index --output FILE` explicitly saves a fresh catalog. A port index can be JSON (an array of objects with `name`, `description`, `homepage`, `provides`, `replaces`, `conflicts`, or `aliases`), TSV/CSV, or the line-oriented output of `port search --index`. The optional `--overrides FILE` flag accepts a curated override file when needed.
 
 ```json
 {"muse-code": {"port": "muse_code", "confidence": 1.0, "reason": "curated"}, "foo": null}

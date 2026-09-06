@@ -1,6 +1,7 @@
 import csv, json, re, subprocess, difflib, urllib.request
 from urllib.parse import urljoin
 from pathlib import Path
+import shutil
 
 def norm(s): return re.sub(r'[^a-z0-9]', '', s.lower())
 
@@ -56,6 +57,19 @@ def cached_macports_ports(cache_path, refresh=False, url='https://ports.macports
     path.parent.mkdir(parents=True,exist_ok=True); path.write_text(json.dumps(rows,indent=2)+'\n')
     if progress: progress(f'Cached {len(rows)} MacPorts ports at {path}')
     return rows
+
+def local_macports_ports(run=subprocess.run):
+    """Read port names from MacPorts' already-maintained local PortIndex."""
+    if not shutil.which('port'):
+        raise RuntimeError('MacPorts is not installed')
+    result=run(['port','-q','echo','all'],capture_output=True,text=True)
+    if result.returncode != 0: raise RuntimeError('Unable to read the local MacPorts PortIndex')
+    names=[]
+    for line in result.stdout.splitlines():
+        name=line.strip()
+        if name and re.fullmatch(r'[A-Za-z0-9+_.-]+',name): names.append(name)
+    if not names: raise RuntimeError('MacPorts returned an empty local PortIndex')
+    return [{'name':name} for name in sorted(set(names))]
 
 def candidates(item, ports, overrides=None):
     overrides=overrides or {}; name=item['name']

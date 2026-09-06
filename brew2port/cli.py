@@ -1,4 +1,4 @@
-import argparse,json,urllib.request,logging,sys
+import argparse,json,urllib.request,logging,sys,subprocess,shutil
 from .core import *
 from .macports import setup_macports
 def main():
@@ -6,7 +6,7 @@ def main():
  a=s.add_parser('inventory'); a.add_argument('-o','--output');
  a=s.add_parser('build-index'); a.add_argument('-o','--output',required=True); a.add_argument('--url',default='https://ports.macports.org/api/v1/ports/')
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
- a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
+ a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
  x=p.parse_args()
@@ -18,8 +18,10 @@ Safe workflow:
   1. Inventory explicitly installed Homebrew packages:
        brew2port inventory --output brew-inventory.json
 
-  2. brew2port downloads and caches the current MacPorts catalog automatically.
-     Use --ports FILE with plan for an offline/local snapshot.
+  2. brew2port uses MacPorts' local PortIndex automatically when `port` is installed.
+     Otherwise it downloads and caches the public catalog.
+     Use --update-macports to refresh the local PortIndex first, or --ports FILE
+     with plan for an offline/local snapshot.
 
   3. If MacPorts is not installed, bootstrap it explicitly:
        brew2port setup-macports
@@ -51,6 +53,13 @@ Homebrew packages are never removed automatically.
   else: ov={}
   if x.ports:
    print(f'Loading local MacPorts catalog: {x.ports}',file=sys.stderr); ports=load_ports(x.ports)
+  elif shutil.which('port'):
+   if x.update_macports:
+    print('Updating the local MacPorts PortIndex with port selfupdate...',file=sys.stderr)
+    subprocess.run(['sudo','port','selfupdate'],check=True)
+   else:
+    print("Using MacPorts' local PortIndex (use --update-macports to refresh it).",file=sys.stderr)
+   ports=local_macports_ports()
   else:
    ports=cached_macports_ports(x.cache,x.refresh_ports,x.ports_url,progress=lambda message: print(message,file=sys.stderr))
   print(f'Matching {len(items)} Homebrew packages against {len(ports)} MacPorts ports...',file=sys.stderr)

@@ -24,3 +24,10 @@ class TestCore(unittest.TestCase):
  def test_select_macos_asset(self):
   asset=select_asset(('15.7',15,'x86_64'),[{'name':'MacPorts-2.12.3-15-Sequoia.pkg'}])
   self.assertEqual(asset['name'],'MacPorts-2.12.3-15-Sequoia.pkg')
+ def test_local_macports_ports(self):
+  import brew2port.core as core
+  old=core.shutil.which; core.shutil.which=lambda name:'/opt/local/bin/port' if name=='port' else old(name)
+  try:
+   def run(*args,**kwargs): return type('R',(),{'returncode':0,'stdout':'wget\nfoo-bar\n'})()
+   self.assertEqual([p['name'] for p in local_macports_ports(run)],['foo-bar','wget'])
+  finally: core.shutil.which=old

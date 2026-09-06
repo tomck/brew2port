@@ -2,7 +2,7 @@ class Brew2port < Formula
   include Language::Python::Virtualenv
   desc "Safe Homebrew to MacPorts migration planner"
   homepage "https://github.com/tomck/brew2port"
-  url "https://github.com/tomck/homebrew-brew2port/archive/refs/tags/v0.1.4.tar.gz"
+  url "https://github.com/tomck/homebrew-brew2port/archive/refs/tags/v0.1.5.tar.gz"
   sha256 "9a7bd476dba5d0b1f20811c47773fa0ec447d7f50d89ec1694562799299a6059"
   license "MIT"
   depends_on "python@3.14"
