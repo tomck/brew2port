@@ -15,6 +15,7 @@ def install
     export PYTHONPATH="#{libexec}${PYTHONPATH:+:$PYTHONPATH}"
     exec "#{Formula["python@3.14"].opt_bin}/python3.14" -m brew2port "$@"
   EOS
+  chmod 0755, bin/"brew2port"
 end
 
   test do
