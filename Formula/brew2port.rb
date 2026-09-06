@@ -7,9 +7,15 @@ class Brew2port < Formula
   license "MIT"
   depends_on "python@3.14"
 
-  def install
-    virtualenv_install_with_resources
-  end
+def install
+  libexec.install "brew2port"
+
+  (bin/"brew2port").write <<~EOS
+    #!/bin/sh
+    export PYTHONPATH="#{libexec}${PYTHONPATH:+:$PYTHONPATH}"
+    exec "#{Formula["python@3.14"].opt_bin}/python3.14" -m brew2port "$@"
+  EOS
+end
 
   test do
     system bin/"brew2port", "--help"
