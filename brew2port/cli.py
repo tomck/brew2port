@@ -6,6 +6,7 @@ def main():
  a=s.add_parser('inventory'); a.add_argument('-o','--output');
  a=s.add_parser('build-index'); a.add_argument('-o','--output',required=True); a.add_argument('--url',default='https://ports.macports.org/api/v1/ports/')
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
+ s.add_parser('update-macports')
  a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
@@ -25,6 +26,8 @@ Safe workflow:
 
   3. If MacPorts is not installed, bootstrap it explicitly:
        brew2port setup-macports
+     To update an existing MacPorts installation independently:
+       brew2port update-macports
 
   4. Generate and review a migration plan:
        brew2port plan --inventory brew-inventory.json \\
@@ -44,6 +47,8 @@ Homebrew packages are never removed automatically.
   data=fetch_macports_ports(x.url); out=json.dumps(data,indent=2)
  elif x.cmd=='setup-macports':
   data=setup_macports(x.version,x.dry_run,x.skip_update,x.yes); out=json.dumps(data,indent=2)
+ elif x.cmd=='update-macports':
+  data=update_macports(); out=json.dumps(data,indent=2)
  elif x.cmd=='plan':
   print('Loading Homebrew inventory...',file=sys.stderr)
   items=json.load(open(x.inventory))

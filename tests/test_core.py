@@ -31,3 +31,10 @@ class TestCore(unittest.TestCase):
    def run(*args,**kwargs): return type('R',(),{'returncode':0,'stdout':'wget\nfoo-bar\n'})()
    self.assertEqual([p['name'] for p in local_macports_ports(run)],['foo-bar','wget'])
   finally: core.shutil.which=old
+ def test_update_macports(self):
+  import brew2port.core as core
+  old=core.shutil.which; core.shutil.which=lambda name:'/opt/local/bin/port'
+  try:
+   result=update_macports(lambda *args,**kwargs:type('R',(),{'returncode':0})())
+   self.assertEqual(result['status'],'updated')
+  finally: core.shutil.which=old

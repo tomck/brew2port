@@ -72,6 +72,14 @@ def local_macports_ports(run=subprocess.run):
     if not names: raise RuntimeError('MacPorts returned an empty local PortIndex')
     return [{'name':name} for name in sorted(set(names))]
 
+def update_macports(run=subprocess.run):
+    """Refresh MacPorts base and its local ports tree."""
+    port=shutil.which('port') or ('/opt/local/bin/port' if Path('/opt/local/bin/port').exists() else None)
+    if not port: raise RuntimeError('MacPorts is not installed; run brew2port setup-macports first')
+    result=run(['sudo',port,'selfupdate'])
+    if result.returncode != 0: raise RuntimeError(f'MacPorts selfupdate failed with exit code {result.returncode}')
+    return {'status':'updated','command':['sudo',port,'selfupdate']}
+
 def candidates(item, ports, overrides=None):
     overrides=overrides or {}; name=item['name']
     if name in overrides: return [dict(overrides[name],port=overrides[name].get('port'))] if overrides[name] else []
