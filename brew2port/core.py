@@ -97,6 +97,16 @@ def candidates(item, ports, overrides=None):
 def make_plan(items,ports,overrides=None):
     return [{'kind':i['kind'],'homebrew':i['name'],'candidates':candidates(i,ports,overrides)} for i in items]
 
+def write_preview_csv(plan, path):
+    with open(path,'w',newline='') as output:
+        writer=csv.writer(output)
+        writer.writerow(['kind','homebrew','recommended_port','confidence','reason','alternatives','review_status'])
+        for row in plan:
+            choices=row.get('candidates',[])
+            recommended=choices[0] if choices else {}
+            confident=bool(choices and choices[0].get('confidence',0)>=.8 and (len(choices)==1 or choices[0].get('confidence',0)-choices[1].get('confidence',0)>=.08))
+            writer.writerow([row.get('kind',''),row.get('homebrew',''),recommended.get('port',''),recommended.get('confidence',''),recommended.get('reason',''),'; '.join(c.get('port','') for c in choices[1:]),'recommended' if confident else 'needs-review'])
+
 def install(plan, yes=False, run=subprocess.run, log=None):
     results=[]
     for row in plan:

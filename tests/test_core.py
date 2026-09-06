@@ -38,3 +38,7 @@ class TestCore(unittest.TestCase):
    result=update_macports(lambda *args,**kwargs:type('R',(),{'returncode':0})())
    self.assertEqual(result['status'],'updated')
   finally: core.shutil.which=old
+ def test_preview_csv(self):
+  with tempfile.NamedTemporaryFile(mode='w+',suffix='.csv') as f:
+   write_preview_csv([{'kind':'formula','homebrew':'muse-code','candidates':[{'port':'muse_code','confidence':.96,'reason':'normalized name'}]}],f.name)
+   f.seek(0); self.assertIn('muse_code',f.read())

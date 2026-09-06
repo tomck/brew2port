@@ -7,6 +7,7 @@ def main():
  a=s.add_parser('build-index'); a.add_argument('-o','--output',required=True); a.add_argument('--url',default='https://ports.macports.org/api/v1/ports/')
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  s.add_parser('update-macports')
+ a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
@@ -26,19 +27,25 @@ Safe workflow:
      Use --update-macports to refresh the local PortIndex first, or --ports FILE
      with plan for an offline/local snapshot.
 
-  3. If MacPorts is not installed, bootstrap it explicitly:
+  3. One-stop preparation (installs/updates MacPorts, inventories Homebrew,
+     creates a plan, and writes a CSV review file):
+       brew2port prepare
+     It does not install migrated ports. After reviewing the CSV, run:
+       brew2port migrate --plan migration-plan.json --install
+
+  4. If MacPorts is not installed, bootstrap it explicitly:
        brew2port setup-macports
      To update an existing MacPorts installation independently:
        brew2port update-macports
 
-  4. Generate and review a migration plan:
+  5. Generate and review a migration plan:
        brew2port plan --inventory brew-inventory.json \\
          --output migration-plan.json
 
-  5. Preview the migration (dry run):
+  6. Preview the migration (dry run):
        brew2port migrate --plan migration-plan.json
 
-  6. Install only after reviewing the preview:
+  7. Install only after reviewing the preview:
        brew2port migrate --plan migration-plan.json --install
 
 Homebrew packages are never removed automatically.
@@ -51,6 +58,22 @@ Homebrew packages are never removed automatically.
   data=setup_macports(x.version,x.dry_run,x.skip_update,x.yes); out=json.dumps(data,indent=2)
  elif x.cmd=='update-macports':
   data=update_macports(); out=json.dumps(data,indent=2)
+ elif x.cmd=='prepare':
+  print('Checking for MacPorts...',file=sys.stderr)
+  if shutil.which('port') or __import__('pathlib').Path('/opt/local/bin/port').exists():
+   if x.skip_update: print('Using the existing MacPorts PortIndex.',file=sys.stderr)
+   else: update_macports()
+  else:
+   print('MacPorts is not installed; bootstrapping it now.',file=sys.stderr)
+   setup_macports(skip_update=x.skip_update,yes=x.yes)
+  print(f'Writing Homebrew inventory to {x.inventory_output}...',file=sys.stderr)
+  items=inventory_from_brew(); open(x.inventory_output,'w').write(json.dumps(items,indent=2)+'\n')
+  ov=json.load(open(x.overrides)) if x.overrides else {}
+  print('Reading the local MacPorts PortIndex...',file=sys.stderr)
+  ports=local_macports_ports(); print(f'Matching {len(items)} Homebrew packages against {len(ports)} MacPorts ports...',file=sys.stderr)
+  data=make_plan(items,ports,ov); open(x.plan_output,'w').write(json.dumps(data,indent=2)+'\n'); write_preview_csv(data,x.preview_output)
+  print(f'Wrote migration plan to {x.plan_output} and review CSV to {x.preview_output}.',file=sys.stderr)
+  out='Preparation complete. Review '+x.preview_output+' before installing anything.\n\nTo apply the reviewed migration:\n  brew2port migrate --plan '+x.plan_output+' --install\n'
  elif x.cmd=='plan':
   print('Loading Homebrew inventory...',file=sys.stderr)
   items=json.load(open(x.inventory))
@@ -74,7 +97,11 @@ Homebrew packages are never removed automatically.
   print(f'Generated migration plan for {len(data)} packages.',file=sys.stderr)
   out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
  elif x.cmd=='migrate':
-  data=install(json.load(open(x.plan)),x.yes if x.install else False); out=json.dumps(data,indent=2)
+  install_now=x.install
+  if x.install and not x.yes:
+   install_now=input('Apply the reviewed migration plan now? [y/N] ').strip().lower() in ('y','yes')
+  data=install(json.load(open(x.plan)),install_now); out=json.dumps(data,indent=2)
+  if x.install and not install_now: out += "\n\nInstallation cancelled. No packages were changed.\n"
   if not x.install: out += "\n\nDry run complete. No packages were changed.\n\nTo perform the reviewed installation:\n  brew2port migrate --plan " + x.plan + " --install\n"
  else:
   data=json.load(open(x.plan)); out=json.dumps(verify_plan(data),indent=2)
