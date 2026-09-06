@@ -6,12 +6,14 @@ Conservative Homebrew → MacPorts migration planner for Intel and Apple-silicon
 
 For the Homebrew tap, use `brew tap tomck/brew2port`; the tap repository is named `homebrew-brew2port` as required by Homebrew, while the source project remains `brew2port`.
 
+If MacPorts is not installed, bootstrap it explicitly with `brew2port setup-macports`. This detects the macOS release, downloads the matching official installer, validates its checksum when the release provides one, validates the package signature, asks for administrator authorization, and verifies `/opt/local/bin/port` afterward. Use `--dry-run` to inspect the selected installer without changing the system, or `--skip-update` to omit the post-install `port selfupdate`.
+
 ## Quick start
 
 ```sh
 python3 -m brew2port inventory --output brew-inventory.json
-python3 -m brew2port plan --inventory brew-inventory.json --ports macports-index.json --overrides overrides.json --output migration-plan.json
-python3 -m brew2port plan --inventory brew-inventory.json --ports macports-index.json --format text
+python3 -m brew2port plan --inventory brew-inventory.json --overrides overrides.json --output migration-plan.json
+python3 -m brew2port plan --inventory brew-inventory.json --format text
 python3 -m brew2port migrate --plan migration-plan.json --install
 python3 -m brew2port verify --plan migration-plan.json
 ```
@@ -20,7 +22,7 @@ Without `--install`, `migrate` is a dry run. `--yes` is required for unattended 
 
 ## Mapping data
 
-`build-index` downloads the documented Homebrew Formulae API (`formula.json`, `cask.json`) and accepts a local MacPorts export. A port index can be JSON (an array of objects with `name`, `description`, `homepage`, `provides`, `replaces`, `conflicts`, or `aliases`), TSV/CSV, or the line-oriented output of `port search --index`. Example override:
+`plan` automatically downloads the public MacPorts catalog from its read-only API and caches it at `~/.cache/brew2port/macports-ports.json`. Use `--refresh-ports` to update it, or `--ports FILE` for a local snapshot. `build-index --output FILE` explicitly saves a fresh catalog. A port index can be JSON (an array of objects with `name`, `description`, `homepage`, `provides`, `replaces`, `conflicts`, or `aliases`), TSV/CSV, or the line-oriented output of `port search --index`. Example override:
 
 ```json
 {"muse-code": {"port": "muse_code", "confidence": 1.0, "reason": "curated"}, "foo": null}

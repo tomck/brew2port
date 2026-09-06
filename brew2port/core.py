@@ -1,4 +1,5 @@
-import csv, json, re, subprocess, difflib
+import csv, json, re, subprocess, difflib, urllib.request
+from urllib.parse import urljoin
 from pathlib import Path
 
 def norm(s): return re.sub(r'[^a-z0-9]', '', s.lower())
@@ -23,6 +24,32 @@ def load_ports(path):
     else:
         for line in lines:
             name=line.split()[0]; rows.append({'name':name,'description':line[len(name):].strip()})
+    return rows
+
+def fetch_macports_ports(url='https://ports.macports.org/api/v1/ports/', opener=urllib.request.urlopen):
+    """Fetch the public MacPorts port catalog, following API pagination."""
+    rows=[]; next_url=url; pages=0
+    while next_url:
+        pages += 1
+        if pages > 5000: raise RuntimeError('MacPorts API pagination exceeded safety limit')
+        request=urllib.request.Request(next_url,headers={'User-Agent':'brew2port/'+__import__('brew2port').__version__})
+        with opener(request) as response: payload=json.loads(response.read().decode())
+        if isinstance(payload,list): page=payload; next_url=None
+        else:
+            page=payload.get('results',payload.get('ports',[]))
+            next_url=urljoin(next_url,payload.get('next')) if payload.get('next') else None
+        for port in page:
+            if isinstance(port,dict):
+                if isinstance(port.get('port'),dict): port={**port['port'],**port}
+                name=port.get('name') or port.get('portname') or port.get('port')
+                if name: rows.append({**port,'name':name})
+    return rows
+
+def cached_macports_ports(cache_path, refresh=False, url='https://ports.macports.org/api/v1/ports/'):
+    path=Path(cache_path).expanduser()
+    if path.exists() and not refresh: return load_ports(path)
+    rows=fetch_macports_ports(url)
+    path.parent.mkdir(parents=True,exist_ok=True); path.write_text(json.dumps(rows,indent=2)+'\n')
     return rows
 
 def candidates(item, ports, overrides=None):
