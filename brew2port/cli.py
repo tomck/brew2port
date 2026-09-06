@@ -26,7 +26,6 @@ Safe workflow:
 
   4. Generate and review a migration plan:
        brew2port plan --inventory brew-inventory.json \\
-         --overrides overrides.json \\
          --output migration-plan.json
 
   5. Preview the migration (dry run):
@@ -44,7 +43,13 @@ Homebrew packages are never removed automatically.
  elif x.cmd=='setup-macports':
   data=setup_macports(x.version,x.dry_run,x.skip_update,x.yes); out=json.dumps(data,indent=2)
  elif x.cmd=='plan':
-  items=json.load(open(x.inventory)); ov=json.load(open(x.overrides)) if x.overrides else {}; ports=load_ports(x.ports) if x.ports else cached_macports_ports(x.cache,x.refresh_ports,x.ports_url); data=make_plan(items,ports,ov); out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
+  items=json.load(open(x.inventory))
+  if x.overrides:
+   try: ov=json.load(open(x.overrides))
+   except FileNotFoundError: p.error(f"overrides file not found: {x.overrides} (omit --overrides or use an absolute path)")
+  else: ov={}
+  ports=load_ports(x.ports) if x.ports else cached_macports_ports(x.cache,x.refresh_ports,x.ports_url)
+  data=make_plan(items,ports,ov); out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
  elif x.cmd=='migrate':
   data=install(json.load(open(x.plan)),x.yes if x.install else False); out=json.dumps(data,indent=2)
   if not x.install: out += "\n\nDry run complete. No packages were changed.\n\nTo perform the reviewed installation:\n  brew2port migrate --plan " + x.plan + " --install\n"

@@ -12,7 +12,7 @@ If MacPorts is not installed, bootstrap it explicitly with `brew2port setup-macp
 
 ```sh
 python3 -m brew2port inventory --output brew-inventory.json
-python3 -m brew2port plan --inventory brew-inventory.json --overrides overrides.json --output migration-plan.json
+python3 -m brew2port plan --inventory brew-inventory.json --output migration-plan.json
 python3 -m brew2port plan --inventory brew-inventory.json --format text
 python3 -m brew2port migrate --plan migration-plan.json --install
 python3 -m brew2port verify --plan migration-plan.json
@@ -22,7 +22,7 @@ Without `--install`, `migrate` is a dry run. `--yes` is required for unattended 
 
 ## Mapping data
 
-`plan` automatically downloads the public MacPorts catalog from its read-only API and caches it at `~/.cache/brew2port/macports-ports.json`. Use `--refresh-ports` to update it, or `--ports FILE` for a local snapshot. `build-index --output FILE` explicitly saves a fresh catalog. A port index can be JSON (an array of objects with `name`, `description`, `homepage`, `provides`, `replaces`, `conflicts`, or `aliases`), TSV/CSV, or the line-oriented output of `port search --index`. Example override:
+`plan` automatically downloads the public MacPorts catalog from its read-only API and caches it at `~/.cache/brew2port/macports-ports.json`. Use `--refresh-ports` to update it, or `--ports FILE` for a local snapshot. `build-index --output FILE` explicitly saves a fresh catalog. A port index can be JSON (an array of objects with `name`, `description`, `homepage`, `provides`, `replaces`, `conflicts`, or `aliases`), TSV/CSV, or the line-oriented output of `port search --index`. The optional `--overrides FILE` flag accepts a curated override file when needed.
 
 ```json
 {"muse-code": {"port": "muse_code", "confidence": 1.0, "reason": "curated"}, "foo": null}
