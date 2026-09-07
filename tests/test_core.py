@@ -55,3 +55,13 @@ class TestCore(unittest.TestCase):
   result=install(plan,yes=True,run=run,target_check=lambda port,run: False)
   self.assertEqual(result[0]['status'],'target-missing')
   self.assertEqual(calls,[])
+
+ def test_automatic_negative_relation_is_not_installable(self):
+  plan=[{'homebrew':'macs-fan-control','recommendation':{'target':{'manager':'macports','package_type':'port','native_name':'qmail-spamcontrol'},'relation_type':'no-equivalent','review_status':'automatic','confidence':1.0},'install_authorized':True,'candidates':[]}]
+  result=install(plan,yes=True,run=lambda *args,**kwargs: (_ for _ in ()).throw(AssertionError('install must not run')))
+  self.assertEqual(result[0]['status'],'needs-review')
+
+ def test_make_plan_reports_progress(self):
+  updates=[]
+  make_plan([{'name':'wget','kind':'formula'}],[{'name':'wget'}],progress=lambda n,total,name: updates.append((n,total,name)))
+  self.assertEqual(updates,[(1,1,'wget')])

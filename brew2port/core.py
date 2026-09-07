@@ -96,7 +96,7 @@ def candidates(item, ports, overrides=None):
         if score>=.55: scored.append({'port':pn,'confidence':round(score,3),'reason':reason})
     return sorted(scored,key=lambda x:x['confidence'],reverse=True)[:5]
 
-def make_plan(items,ports,overrides=None,definitions=None):
+def make_plan(items,ports,overrides=None,definitions=None,progress=None):
     definitions=definitions or {}
     rows=[]
     for item in items:
@@ -109,6 +109,8 @@ def make_plan(items,ports,overrides=None,definitions=None):
             if shared:
                 row.update({'source':shared['source'],'recommendation':shared['recommendation'],'action':shared['action'],'install_authorized':shared['install_authorized']})
         rows.append(row)
+        if progress:
+            progress(len(rows),len(items),item['name'])
     return rows
 
 def write_preview_csv(plan, path):
@@ -122,7 +124,10 @@ def write_preview_csv(plan, path):
             port=recommended.get('port') or target.get('native_name','')
             confidence=recommended.get('confidence','')
             reason=recommended.get('reason') or recommended.get('matching_method','')
-            confident=bool(row.get('recommendation') and row.get('install_authorized') and install_allowed(row))
+            if row.get('recommendation'):
+                confident=bool(row.get('install_authorized') and install_allowed(row))
+            else:
+                confident=bool(choices and choices[0].get('relation_type') not in {'no-equivalent','conflicts'} and choices[0].get('confidence',0)>=.8 and (len(choices)==1 or choices[0].get('confidence',0)-choices[1].get('confidence',0)>=.08))
             alternatives='; '.join(c.get('port') or c.get('target',{}).get('native_name','') for c in choices[1:])
             writer.writerow([row.get('kind',''),row.get('homebrew',''),port,confidence,reason,alternatives,'recommended' if confident else 'needs-review'])
 
@@ -131,9 +136,10 @@ def install(plan, yes=False, run=subprocess.run, log=None, target_check=target_e
     for row in plan:
         if row.get('recommendation'):
             shared=row
-            chosen=row['recommendation'] if install_allowed(shared) else None
+            relation_type=row['recommendation'].get('relation_type')
+            chosen=row['recommendation'] if relation_type not in {'no-equivalent','conflicts'} and install_allowed(shared) else None
         else:
-            cs=row['candidates']; chosen=cs[0] if cs and row.get('catalog_status','automatic')=='automatic' and cs[0]['confidence']>=.8 and (len(cs)==1 or cs[0]['confidence']-cs[1]['confidence']>=.08) else None
+            cs=row['candidates']; chosen=cs[0] if cs and cs[0].get('relation_type') not in {'no-equivalent','conflicts'} and row.get('catalog_status','automatic')=='automatic' and cs[0]['confidence']>=.8 and (len(cs)==1 or cs[0]['confidence']-cs[1]['confidence']>=.08) else None
         if not chosen: results.append({**row,'status':'needs-review'}); continue
         port=chosen.get('port') or chosen.get('target',{}).get('native_name') or chosen.get('name')
         cmd=['sudo','port','install',port]

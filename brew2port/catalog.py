@@ -36,7 +36,8 @@ def definitions_for(items, command="macpkgmap", run=subprocess.run, progress=Non
         if version: versions.add(version)
         source=Identity("homebrew",kind,name)
         candidates=[candidate for candidate in candidates_for(response.get("results",[]),source)
-                    if candidate.target.manager == "macports"]
+                    if candidate.target.manager == "macports"
+                    and candidate.relation_type not in {"no-equivalent", "conflicts"}]
         shared=plan_record(source,candidates,version,preference=("macports",))
         status=shared["recommendation"]["review_status"] if shared["recommendation"] else (candidates[0].review_status if candidates else "missing")
         table[(kind,name)]={"candidates":[candidate.as_dict() for candidate in candidates],"catalog_status":status,"catalog_version":version,"shared_record":shared}

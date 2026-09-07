@@ -35,3 +35,19 @@ class TestCatalog(unittest.TestCase):
         self.assertEqual(candidate["review_status"], "needs-review")
         self.assertEqual(candidate["evidence"][0]["value"], "ansible")
         self.assertEqual(candidate["source_catalog_versions"]["macports"], "macports-portindex")
+
+    def test_negative_relations_are_not_candidates(self):
+        relation = {
+            "source": {"manager": "homebrew", "package_type": "cask", "native_name": "macs-fan-control"},
+            "target": {"manager": "macports", "package_type": "port", "native_name": "qmail-spamcontrol"},
+            "type": "no-equivalent", "confidence": 1.0,
+            "matching_method": "curated", "review_status": "automatic",
+            "evidence": [{"kind": "curated-negative"}],
+        }
+        class Result:
+            returncode = 0
+            stderr = ""
+            stdout = json.dumps({"catalog_version": "catalog-test", "results": [relation]})
+        table = definitions_for([{"kind": "cask", "name": "macs-fan-control"}], run=lambda *a, **k: Result())
+        self.assertEqual(table[("cask", "macs-fan-control")]["candidates"], [])
+        self.assertIsNone(table[("cask", "macs-fan-control")]["shared_record"]["recommendation"])
