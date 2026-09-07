@@ -4,7 +4,7 @@ Conservative Homebrew → MacPorts migration planner for Intel and Apple-silicon
 
 `brew2port` inventories only formulae installed on request (not dependency leaves) and installed casks, scores possible MacPorts equivalents, and produces a reviewable plan. It never removes Homebrew packages automatically. MacPorts installation is opt-in and each command is shown before execution.
 
-For the Homebrew tap, use `brew tap tomck/brew2port`; the tap repository is named `homebrew-brew2port` as required by Homebrew, while the source project remains `brew2port`.
+For the Homebrew tap, use `brew tap tomck/escapefrombrewyork`; this repository contains the application source, while the tap formula lives in the `escapefrombrewyork` tap alongside `macpkgmap` and `brew2fink`.
 
 The one-stop preparation workflow is `brew2port prepare`. It ensures MacPorts is present, refreshes its local PortIndex, inventories Homebrew, generates `migration-plan.json`, and writes `migration-preview.csv` for review. It does not install any migrated ports. After reviewing the CSV, run `brew2port migrate --plan migration-plan.json --install`; that command asks for confirmation, while `--yes` enables unattended execution.
 
