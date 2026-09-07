@@ -26,7 +26,7 @@ Without `--install`, `migrate` is a dry run. `--yes` is required for unattended 
 
 ## Mapping data
 
-`plan` queries the installed `macpkgmap` catalog client for each inventoried package. The client returns the catalog version, relationship type, confidence, review status, matching method, evidence, and source catalog versions; near-hits remain review-only. Anything not covered by the catalog falls back to the local MacPorts `PortIndex` when `port` is installed. Install the catalog client with `brew tap tomck/escapefrombrewyork && brew install macpkgmap`. brew2port does not require a checkout of the catalog repository and does not download the full catalog itself. The optional `--overrides FILE` flag accepts a curated override file when needed.
+`plan` queries the installed `macpkgmap` catalog client for each inventoried package. The client returns the catalog version, relationship type, confidence, review status, matching method, evidence, and source catalog versions; near-hits remain review-only. Anything not covered by the catalog falls back to the local MacPorts `PortIndex` when `port` is installed. Install the catalog client with `brew tap tomck/escapefrombrewyork && brew install macpkgmap`. The shared manager-neutral planning and safety primitives are provided by the `macpkg-migrate-core` package; brew2port does not require a checkout of the catalog repository and does not download the full catalog itself. The optional `--overrides FILE` flag accepts a curated override file when needed.
 
 Catalog matching policy is owned by `macpkgmap`; generic character similarity is not package evidence, and uncertain or near-hit results require review. MacPorts target existence is checked against the local PortIndex before any installation command is run.
 

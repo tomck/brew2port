@@ -2,7 +2,7 @@
 import json
 import subprocess
 
-from macpkg_migrate.core import Identity, candidates_for, plan_record
+from macpkg_migrate_core import Identity, candidates_for, plan_record
 
 INSTALL_HINT = "brew tap tomck/escapefrombrewyork\nbrew install macpkgmap"
 

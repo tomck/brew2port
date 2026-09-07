@@ -2,7 +2,7 @@ import csv, json, re, subprocess, difflib, urllib.request
 from urllib.parse import urljoin
 from pathlib import Path
 import shutil
-from macpkg_migrate.core import Identity, Candidate, dry_run as shared_dry_run, install_allowed, plan_record
+from macpkg_migrate_core import Identity, Candidate, dry_run as shared_dry_run, install_allowed, plan_record
 from .macports import target_exists
 
 def norm(s): return re.sub(r'[^a-z0-9]', '', s.lower())
