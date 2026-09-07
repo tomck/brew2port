@@ -50,4 +50,6 @@ class TestCatalog(unittest.TestCase):
             stdout = json.dumps({"catalog_version": "catalog-test", "results": [relation]})
         table = definitions_for([{"kind": "cask", "name": "macs-fan-control"}], run=lambda *a, **k: Result())
         self.assertEqual(table[("cask", "macs-fan-control")]["candidates"], [])
+        self.assertTrue(table[("cask", "macs-fan-control")]["negative_relation"])
+        self.assertEqual(table[("cask", "macs-fan-control")]["catalog_status"], "no-equivalent")
         self.assertIsNone(table[("cask", "macs-fan-control")]["shared_record"]["recommendation"])

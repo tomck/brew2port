@@ -65,3 +65,9 @@ class TestCore(unittest.TestCase):
   updates=[]
   make_plan([{'name':'wget','kind':'formula'}],[{'name':'wget'}],progress=lambda n,total,name: updates.append((n,total,name)))
   self.assertEqual(updates,[(1,1,'wget')])
+
+ def test_negative_catalog_relation_blocks_fallback_matching(self):
+  definitions={('cask','macs-fan-control'):{'candidates':[],'negative_relation':True,'catalog_status':'no-equivalent','catalog_version':'catalog-test','shared_record':{'source':{'manager':'homebrew','package_type':'cask','native_name':'macs-fan-control'},'recommendation':None,'action':'review','install_authorized':False}}}
+  result=make_plan([{'kind':'cask','name':'macs-fan-control'}],[{'name':'qmail-spamcontrol'}],definitions=definitions)
+  self.assertEqual(result[0]['candidates'],[])
+  self.assertEqual(result[0]['catalog_status'],'no-equivalent')

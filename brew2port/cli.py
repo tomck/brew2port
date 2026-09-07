@@ -104,7 +104,7 @@ Homebrew packages are never removed automatically.
   items=inventory_from_brew(); open(x.inventory_output,'w').write(json.dumps(items,indent=2)+'\n')
   ov=json.load(open(x.overrides)) if x.overrides else {}
   defs=definitions_for(items,x.catalog_command,progress=progress_message)
-  known=sum((item['kind'],item['name']) in defs for item in items)
+  known=sum(bool(defs.get((item['kind'],item['name']),{}).get('candidates') or defs.get((item['kind'],item['name']),{}).get('negative_relation')) for item in items)
   print(f'Definitions database covers {known} of {len(items)} installed packages.',file=sys.stderr)
   ports=[]
   if known < len(items):
@@ -123,7 +123,7 @@ Homebrew packages are never removed automatically.
    except FileNotFoundError: p.error(f"overrides file not found: {x.overrides} (omit --overrides or use an absolute path)")
   else: ov={}
   defs=definitions_for(items,x.catalog_command,progress=progress_message)
-  known=sum((item['kind'],item['name']) in defs for item in items)
+  known=sum(bool(defs.get((item['kind'],item['name']),{}).get('candidates') or defs.get((item['kind'],item['name']),{}).get('negative_relation')) for item in items)
   print(f'Definitions database covers {known} of {len(items)} packages.',file=sys.stderr)
   if x.ports:
    print(f'Loading local MacPorts catalog: {x.ports}',file=sys.stderr); ports=load_ports(x.ports)

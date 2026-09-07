@@ -35,12 +35,14 @@ def definitions_for(items, command="macpkgmap", run=subprocess.run, progress=Non
         version=response.get("catalog_version");
         if version: versions.add(version)
         source=Identity("homebrew",kind,name)
-        candidates=[candidate for candidate in candidates_for(response.get("results",[]),source)
-                    if candidate.target.manager == "macports"
-                    and candidate.relation_type not in {"no-equivalent", "conflicts"}]
+        all_candidates=[candidate for candidate in candidates_for(response.get("results",[]),source)
+                        if candidate.target.manager == "macports"]
+        negative=any(candidate.relation_type in {"no-equivalent", "conflicts"} for candidate in all_candidates)
+        candidates=[candidate for candidate in all_candidates
+                    if candidate.relation_type not in {"no-equivalent", "conflicts"}]
         shared=plan_record(source,candidates,version,preference=("macports",))
-        status=shared["recommendation"]["review_status"] if shared["recommendation"] else (candidates[0].review_status if candidates else "missing")
-        table[(kind,name)]={"candidates":[candidate.as_dict() for candidate in candidates],"catalog_status":status,"catalog_version":version,"shared_record":shared}
+        status=shared["recommendation"]["review_status"] if shared["recommendation"] else ("no-equivalent" if negative else (candidates[0].review_status if candidates else "missing"))
+        table[(kind,name)]={"candidates":[candidate.as_dict() for candidate in candidates],"catalog_status":status,"catalog_version":version,"negative_relation":negative,"shared_record":shared}
         if progress: progress(f"Catalog lookup: {kind} {name}")
     table["catalog_version"]=(next(iter(versions)) if len(versions)==1 else ",".join(sorted(versions)))
     return table

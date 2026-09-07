@@ -101,13 +101,16 @@ def make_plan(items,ports,overrides=None,definitions=None,progress=None):
     rows=[]
     for item in items:
         key=(item['kind'],item['name'])
-        choices=definitions[key]['candidates'] if key in definitions else candidates(item,ports,overrides)
+        use_catalog=key in definitions and (definitions[key].get('candidates') or definitions[key].get('negative_relation'))
+        choices=definitions[key]['candidates'] if use_catalog else candidates(item,ports,overrides)
         row={'kind':item['kind'],'source_manager':'homebrew','source_package':item['name'],'target_manager':'macports','homebrew':item['name'],'candidates':choices}
         if key in definitions:
             shared=definitions[key].get('shared_record')
             row['catalog_status']=definitions[key].get('catalog_status','needs-review'); row['catalog_version']=definitions[key].get('catalog_version') or definitions.get('catalog_version')
             if shared:
                 row.update({'source':shared['source'],'recommendation':shared['recommendation'],'action':shared['action'],'install_authorized':shared['install_authorized']})
+            if definitions[key].get('negative_relation'):
+                row['negative_relation']=True
         rows.append(row)
         if progress:
             progress(len(rows),len(items),item['name'])
