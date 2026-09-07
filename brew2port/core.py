@@ -2,6 +2,8 @@ import csv, json, re, subprocess, difflib, urllib.request
 from urllib.parse import urljoin
 from pathlib import Path
 import shutil
+from macpkg_migrate.core import Identity, Candidate, dry_run as shared_dry_run, install_allowed, plan_record
+from .macports import target_exists
 
 def norm(s): return re.sub(r'[^a-z0-9]', '', s.lower())
 
@@ -102,7 +104,10 @@ def make_plan(items,ports,overrides=None,definitions=None):
         choices=definitions[key]['candidates'] if key in definitions else candidates(item,ports,overrides)
         row={'kind':item['kind'],'source_manager':'homebrew','source_package':item['name'],'target_manager':'macports','homebrew':item['name'],'candidates':choices}
         if key in definitions:
+            shared=definitions[key].get('shared_record')
             row['catalog_status']=definitions[key].get('catalog_status','needs-review'); row['catalog_version']=definitions[key].get('catalog_version') or definitions.get('catalog_version')
+            if shared:
+                row.update({'source':shared['source'],'recommendation':shared['recommendation'],'action':shared['action'],'install_authorized':shared['install_authorized']})
         rows.append(row)
     return rows
 
@@ -113,23 +118,37 @@ def write_preview_csv(plan, path):
         for row in plan:
             choices=row.get('candidates',[])
             recommended=choices[0] if choices else {}
-            confident=bool(choices and row.get('catalog_status','automatic')=='automatic' and choices[0].get('confidence',0)>=.8 and (len(choices)==1 or choices[0].get('confidence',0)-choices[1].get('confidence',0)>=.08))
-            writer.writerow([row.get('kind',''),row.get('homebrew',''),recommended.get('port',''),recommended.get('confidence',''),recommended.get('reason',''),'; '.join(c.get('port','') for c in choices[1:]),'recommended' if confident else 'needs-review'])
+            target=recommended.get('target',{})
+            port=recommended.get('port') or target.get('native_name','')
+            confidence=recommended.get('confidence','')
+            reason=recommended.get('reason') or recommended.get('matching_method','')
+            confident=bool(row.get('recommendation') and row.get('install_authorized') and install_allowed(row))
+            alternatives='; '.join(c.get('port') or c.get('target',{}).get('native_name','') for c in choices[1:])
+            writer.writerow([row.get('kind',''),row.get('homebrew',''),port,confidence,reason,alternatives,'recommended' if confident else 'needs-review'])
 
-def install(plan, yes=False, run=subprocess.run, log=None):
+def install(plan, yes=False, run=subprocess.run, log=None, target_check=target_exists):
     results=[]
     for row in plan:
-        cs=row['candidates']; chosen=cs[0] if cs and row.get('catalog_status','automatic')=='automatic' and cs[0]['confidence']>=.8 and (len(cs)==1 or cs[0]['confidence']-cs[1]['confidence']>=.08) else None
+        if row.get('recommendation'):
+            shared=row
+            chosen=row['recommendation'] if install_allowed(shared) else None
+        else:
+            cs=row['candidates']; chosen=cs[0] if cs and row.get('catalog_status','automatic')=='automatic' and cs[0]['confidence']>=.8 and (len(cs)==1 or cs[0]['confidence']-cs[1]['confidence']>=.08) else None
         if not chosen: results.append({**row,'status':'needs-review'}); continue
-        cmd=['sudo','port','install',chosen['port']]
+        port=chosen.get('port') or chosen.get('target',{}).get('native_name') or chosen.get('name')
+        cmd=['sudo','port','install',port]
         if not yes: results.append({**row,'status':'dry-run','command':cmd}); continue
+        if not target_check(port,run=run):
+            results.append({**row,'status':'target-missing','command':cmd,'reason':'MacPorts target is absent from the local PortIndex'})
+            continue
         r=run(cmd); results.append({**row,'status':'installed' if r.returncode==0 else 'failed','command':cmd})
     return results
 
 def verify_plan(plan, run=subprocess.run):
     out=[]
     for row in plan:
-        port=row.get('port') or (row.get('candidates') or [{}])[0].get('port')
+        recommendation=row.get('recommendation') or {}
+        port=row.get('port') or recommendation.get('target',{}).get('native_name') or (row.get('candidates') or [{}])[0].get('port') or (row.get('candidates') or [{}])[0].get('target',{}).get('native_name')
         if not port: out.append({'homebrew':row['homebrew'],'port':None,'verified':False,'reason':'no mapping'}); continue
         r=run(['port','installed',port],capture_output=True,text=True)
         out.append({'homebrew':row['homebrew'],'port':port,'verified':r.returncode==0 and port in r.stdout})

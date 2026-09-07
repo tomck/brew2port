@@ -42,3 +42,16 @@ class TestCore(unittest.TestCase):
   with tempfile.NamedTemporaryFile(mode='w+',suffix='.csv') as f:
    write_preview_csv([{'kind':'formula','homebrew':'muse-code','candidates':[{'port':'muse_code','confidence':.96,'reason':'normalized name'}]}],f.name)
    f.seek(0); self.assertIn('muse_code',f.read())
+
+ def test_shared_review_candidate_is_not_installable(self):
+  plan=[{'homebrew':'ansible@12','source':{'manager':'homebrew','package_type':'formula','native_name':'ansible@12'},'catalog_version':'catalog-test','candidates':[{'target':{'manager':'macports','package_type':'port','native_name':'py313-ansible'},'relation_type':'equivalent','confidence':.78,'review_status':'needs-review','matching_method':'version-family','evidence':[{'kind':'version-family'}],'source_catalog_versions':{}}],'recommendation':None,'install_authorized':False}]
+  result=install(plan,yes=True,run=lambda *args,**kwargs: (_ for _ in ()).throw(AssertionError('install must not run')))
+  self.assertEqual(result[0]['status'],'needs-review')
+
+ def test_install_rejects_missing_local_target(self):
+  plan=[{'homebrew':'wget','candidates':[{'port':'wget','confidence':1.0}]}]
+  calls=[]
+  def run(*args,**kwargs): calls.append(args[0]); return type('R',(),{'returncode':99,'stdout':'','stderr':''})()
+  result=install(plan,yes=True,run=run,target_check=lambda port,run: False)
+  self.assertEqual(result[0]['status'],'target-missing')
+  self.assertEqual(calls,[])

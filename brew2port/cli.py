@@ -40,9 +40,10 @@ Safe workflow:
   1. Inventory explicitly installed Homebrew packages:
        brew2port inventory --output brew-inventory.json
 
-  2. brew2port first checks its published definitions database for known mappings.
+ 2. brew2port queries the installed `macpkgmap` catalog client for known mappings.
      Anything not covered there uses MacPorts' local PortIndex automatically when
-     `port` is installed. Otherwise it downloads and caches the public catalog.
+     `port` is installed. Install the catalog client with:
+       brew tap tomck/escapefrombrewyork && brew install macpkgmap
      Use --update-macports to refresh the local PortIndex first, or --ports FILE
      with plan for an offline/local snapshot.
 

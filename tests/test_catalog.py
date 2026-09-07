@@ -1,7 +1,7 @@
 import json
 import tempfile
 import unittest
-from brew2port.catalog import load_catalog
+from brew2port.catalog import definitions_for, load_catalog
 
 class TestCatalog(unittest.TestCase):
     def test_loads_confident_and_near_hit_relationships(self):
@@ -13,3 +13,25 @@ class TestCatalog(unittest.TestCase):
             json.dump(data,handle); handle.flush(); table=load_catalog(handle.name)
         self.assertEqual(table[("formula","node")]["candidates"][0]["port"],"nodejs26")
         self.assertEqual(table[("formula","ansible@12")]["candidates"][0]["catalog_status"],"needs-review")
+
+    def test_shared_core_contract_is_preserved(self):
+        relation = {
+            "source": {"manager": "homebrew", "package_type": "formula", "native_name": "ansible@12"},
+            "target": {"manager": "macports", "package_type": "port", "native_name": "py313-ansible"},
+            "type": "equivalent", "confidence": 0.78,
+            "matching_method": "version-family", "review_status": "needs-review",
+            "evidence": [{"kind": "version-family", "value": "ansible"}],
+            "source_catalog_versions": {"homebrew": "homebrew-api", "macports": "macports-portindex"},
+        }
+        class Result:
+            returncode = 0
+            stderr = ""
+            stdout = json.dumps({"catalog_version": "catalog-test", "results": [relation]})
+        table = definitions_for([{"kind": "formula", "name": "ansible@12"}], run=lambda *a, **k: Result())
+        record = table[("formula", "ansible@12")]["shared_record"]
+        candidate = record["candidates"][0]
+        self.assertEqual(record["catalog_version"], "catalog-test")
+        self.assertEqual(candidate["relation_type"], "equivalent")
+        self.assertEqual(candidate["review_status"], "needs-review")
+        self.assertEqual(candidate["evidence"][0]["value"], "ansible")
+        self.assertEqual(candidate["source_catalog_versions"]["macports"], "macports-portindex")

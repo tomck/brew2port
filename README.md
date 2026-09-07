@@ -26,19 +26,9 @@ Without `--install`, `migrate` is a dry run. `--yes` is required for unattended 
 
 ## Mapping data
 
-`plan` first checks a small, published definitions database of trusted mappings. It is cached at `~/.cache/brew2port/definitions.json`, so common packages do not require a large catalog download or pairwise matching. Anything absent from that table falls back to the local MacPorts `PortIndex` when `port` is installed. Use `--refresh-definitions` to fetch the newest published table. If MacPorts is not installed, brew2port downloads the public MacPorts catalog from its read-only API and caches it at `~/.cache/brew2port/macports-ports.json`. Use `--refresh-ports` to update that web cache, or `--ports FILE` for a local snapshot. `build-index --output FILE` explicitly saves a fresh catalog. A port index can be JSON (an array of objects with `name`, `description`, `homepage`, `provides`, `replaces`, `conflicts`, or `aliases`), TSV/CSV, or the line-oriented output of `port search --index`. The optional `--overrides FILE` flag accepts a curated override file when needed.
+`plan` queries the installed `macpkgmap` catalog client for each inventoried package. The client returns the catalog version, relationship type, confidence, review status, matching method, evidence, and source catalog versions; near-hits remain review-only. Anything not covered by the catalog falls back to the local MacPorts `PortIndex` when `port` is installed. Install the catalog client with `brew tap tomck/escapefrombrewyork && brew install macpkgmap`. brew2port does not require a checkout of the catalog repository and does not download the full catalog itself. The optional `--overrides FILE` flag accepts a curated override file when needed.
 
-The definitions database is generated from the current Homebrew formula/cask APIs and MacPorts port index by `build-definitions`. A scheduled GitHub Actions workflow refreshes `definitions/mappings.json` weekly and can also be run manually. The workflow publishes only high-confidence or curated mappings; it does not turn uncertain fuzzy matches into automatic installations. The repository is public, so standard GitHub-hosted Actions runners are free. Users can also generate a private/local table when reviewing changes:
-
-```sh
-python3 -m brew2port build-definitions --output definitions/mappings.json
-```
-
-```json
-{"muse-code": {"port": "muse_code", "confidence": 1.0, "reason": "curated"}, "foo": null}
-```
-
-`null` explicitly marks a package as no-match. Matching order is exact, normalized spelling, aliases/provides/replaces, conservative shared-stem/token evidence, then curated overrides. Generic character similarity is deliberately not treated as package evidence, and casks do not receive spelling-only heuristic matches. Scores are evidence, not proof; ambiguous and low-confidence results require review.
+Catalog matching policy is owned by `macpkgmap`; generic character similarity is not package evidence, and uncertain or near-hit results require review. MacPorts target existence is checked against the local PortIndex before any installation command is run.
 
 ## Development
 
@@ -47,6 +37,6 @@ python3 -m unittest discover -s tests
 python3 -m pip install .
 ```
 
-The Homebrew formula template is in `packaging/homebrew/brew2port.rb`; release archives should be built from a tagged commit and checksum-pinned there.
+The Homebrew formula is maintained in the dedicated `tomck/homebrew-escapefrombrewyork` tap; release archives should be built from a tagged commit and checksum-pinned there.
 
 Sources: [Homebrew Formulae API](https://formulae.brew.sh/docs/api/), [Homebrew querying](https://docs.brew.sh/Querying-Brew), and [MacPorts port(1)](https://man.macports.org/port.1.html).

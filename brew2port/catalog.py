@@ -2,6 +2,8 @@
 import json
 import subprocess
 
+from macpkg_migrate.core import Identity, candidates_for, plan_record
+
 INSTALL_HINT = "brew tap tomck/escapefrombrewyork\nbrew install macpkgmap"
 
 def load_catalog(path):
@@ -32,13 +34,12 @@ def definitions_for(items, command="macpkgmap", run=subprocess.run, progress=Non
         response=query(command,"homebrew",kind,name,run=run)
         version=response.get("catalog_version");
         if version: versions.add(version)
-        relations=response.get("results",[])
-        candidates=[]; status="missing"
-        for relation in relations:
-            target=relation.get("target",{}); status=relation.get("review_status", "needs-review")
-            if target.get("manager") != "macports": continue
-            candidates.append({"port":target.get("native_name"),"confidence":relation.get("confidence",0),"reason":relation.get("matching_method","catalog"),"catalog_status":status})
-        table[(kind,name)]={"candidates":sorted(candidates,key=lambda x:x.get("confidence",0),reverse=True),"catalog_status":status,"catalog_version":version}
+        source=Identity("homebrew",kind,name)
+        candidates=[candidate for candidate in candidates_for(response.get("results",[]),source)
+                    if candidate.target.manager == "macports"]
+        shared=plan_record(source,candidates,version,preference=("macports",))
+        status=shared["recommendation"]["review_status"] if shared["recommendation"] else (candidates[0].review_status if candidates else "missing")
+        table[(kind,name)]={"candidates":[candidate.as_dict() for candidate in candidates],"catalog_status":status,"catalog_version":version,"shared_record":shared}
         if progress: progress(f"Catalog lookup: {kind} {name}")
     table["catalog_version"]=(next(iter(versions)) if len(versions)==1 else ",".join(sorted(versions)))
     return table

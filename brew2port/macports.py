@@ -2,6 +2,17 @@ import hashlib, json, platform, shutil, subprocess, tempfile
 import urllib.request
 from pathlib import Path
 
+def port_executable():
+    return shutil.which('port') or ('/opt/local/bin/port' if Path('/opt/local/bin/port').exists() else None)
+
+def target_exists(name, run=subprocess.run):
+    """Check the local MacPorts index before allowing a target installation."""
+    port=port_executable()
+    if not port:
+        return False
+    result=run([port,'info',name],capture_output=True,text=True)
+    return result.returncode == 0 and name in result.stdout
+
 RELEASES_URL = 'https://api.github.com/repos/macports/macports-base/releases'
 OS_NAMES = {
     26: 'Tahoe', 15: 'Sequoia', 14: 'Sonoma', 13: 'Ventura', 12: 'Monterey',
