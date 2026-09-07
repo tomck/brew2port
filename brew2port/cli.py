@@ -4,7 +4,7 @@ from .definitions import (DEFAULT_DEFINITIONS_CACHE, DEFAULT_DEFINITIONS_URL,
                           build_definitions_from_urls, fetch_definitions,
                           load_definitions)
 from .macports import setup_macports
-from .catalog import fetch_catalog, DEFAULT_CATALOG_CACHE, DEFAULT_CATALOG_URL
+from .catalog import definitions_for
 
 def plan_progress(number,total,name):
  width=32; complete=int(width*number/total) if total else width
@@ -18,9 +18,6 @@ def progress_message(message):
 def local_port_available():
  return bool(shutil.which('port') or __import__('pathlib').Path('/opt/local/bin/port').exists())
 
-def definitions_for(args):
- return fetch_catalog(args.catalog,args.refresh_catalog,args.catalog_url,progress=progress_message)
-
 def main():
  p=argparse.ArgumentParser(prog='brew2port'); p.add_argument('--update-macports',action='store_true',dest='update_macports_global'); s=p.add_subparsers(dest='cmd')
  a=s.add_parser('inventory'); a.add_argument('-o','--output');
@@ -28,8 +25,8 @@ def main():
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  s.add_parser('update-macports')
  a=s.add_parser('build-definitions'); a.add_argument('-o','--output',required=True); a.add_argument('--formulae-url',default='https://formulae.brew.sh/api/formula.json'); a.add_argument('--casks-url',default='https://formulae.brew.sh/api/cask.json'); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--overrides')
- a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--catalog',default=DEFAULT_CATALOG_CACHE); a.add_argument('--catalog-url',default=DEFAULT_CATALOG_URL); a.add_argument('--refresh-catalog',action='store_true'); a.add_argument('--definitions',default=DEFAULT_DEFINITIONS_CACHE); a.add_argument('--definitions-url',default=DEFAULT_DEFINITIONS_URL); a.add_argument('--refresh-definitions',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
- a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--catalog',default=DEFAULT_CATALOG_CACHE); a.add_argument('--catalog-url',default=DEFAULT_CATALOG_URL); a.add_argument('--refresh-catalog',action='store_true'); a.add_argument('--definitions',default=DEFAULT_DEFINITIONS_CACHE); a.add_argument('--definitions-url',default=DEFAULT_DEFINITIONS_URL); a.add_argument('--refresh-definitions',action='store_true'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
+ a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
+ a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
  x=p.parse_args()
@@ -105,7 +102,7 @@ Homebrew packages are never removed automatically.
   print(f'Writing Homebrew inventory to {x.inventory_output}...',file=sys.stderr)
   items=inventory_from_brew(); open(x.inventory_output,'w').write(json.dumps(items,indent=2)+'\n')
   ov=json.load(open(x.overrides)) if x.overrides else {}
-  defs=definitions_for(x)
+  defs=definitions_for(items,x.catalog_command,progress=progress_message)
   known=sum((item['kind'],item['name']) in defs for item in items)
   print(f'Definitions database covers {known} of {len(items)} installed packages.',file=sys.stderr)
   ports=[]
@@ -124,7 +121,7 @@ Homebrew packages are never removed automatically.
    try: ov=json.load(open(x.overrides))
    except FileNotFoundError: p.error(f"overrides file not found: {x.overrides} (omit --overrides or use an absolute path)")
   else: ov={}
-  defs=definitions_for(x)
+  defs=definitions_for(items,x.catalog_command,progress=progress_message)
   known=sum((item['kind'],item['name']) in defs for item in items)
   print(f'Definitions database covers {known} of {len(items)} packages.',file=sys.stderr)
   if x.ports:

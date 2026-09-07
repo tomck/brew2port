@@ -94,8 +94,17 @@ def candidates(item, ports, overrides=None):
         if score>=.55: scored.append({'port':pn,'confidence':round(score,3),'reason':reason})
     return sorted(scored,key=lambda x:x['confidence'],reverse=True)[:5]
 
-def make_plan(items,ports,overrides=None):
-    return [{'kind':i['kind'],'homebrew':i['name'],'candidates':candidates(i,ports,overrides)} for i in items]
+def make_plan(items,ports,overrides=None,definitions=None):
+    definitions=definitions or {}
+    rows=[]
+    for item in items:
+        key=(item['kind'],item['name'])
+        choices=definitions[key]['candidates'] if key in definitions else candidates(item,ports,overrides)
+        row={'kind':item['kind'],'source_manager':'homebrew','source_package':item['name'],'target_manager':'macports','homebrew':item['name'],'candidates':choices}
+        if key in definitions:
+            row['catalog_status']=definitions[key].get('catalog_status','needs-review'); row['catalog_version']=definitions[key].get('catalog_version') or definitions.get('catalog_version')
+        rows.append(row)
+    return rows
 
 def write_preview_csv(plan, path):
     with open(path,'w',newline='') as output:
@@ -104,13 +113,13 @@ def write_preview_csv(plan, path):
         for row in plan:
             choices=row.get('candidates',[])
             recommended=choices[0] if choices else {}
-            confident=bool(choices and choices[0].get('confidence',0)>=.8 and (len(choices)==1 or choices[0].get('confidence',0)-choices[1].get('confidence',0)>=.08))
+            confident=bool(choices and row.get('catalog_status','automatic')=='automatic' and choices[0].get('confidence',0)>=.8 and (len(choices)==1 or choices[0].get('confidence',0)-choices[1].get('confidence',0)>=.08))
             writer.writerow([row.get('kind',''),row.get('homebrew',''),recommended.get('port',''),recommended.get('confidence',''),recommended.get('reason',''),'; '.join(c.get('port','') for c in choices[1:]),'recommended' if confident else 'needs-review'])
 
 def install(plan, yes=False, run=subprocess.run, log=None):
     results=[]
     for row in plan:
-        cs=row['candidates']; chosen=cs[0] if cs and cs[0]['confidence']>=.8 and (len(cs)==1 or cs[0]['confidence']-cs[1]['confidence']>=.08) else None
+        cs=row['candidates']; chosen=cs[0] if cs and row.get('catalog_status','automatic')=='automatic' and cs[0]['confidence']>=.8 and (len(cs)==1 or cs[0]['confidence']-cs[1]['confidence']>=.08) else None
         if not chosen: results.append({**row,'status':'needs-review'}); continue
         cmd=['sudo','port','install',chosen['port']]
         if not yes: results.append({**row,'status':'dry-run','command':cmd}); continue
