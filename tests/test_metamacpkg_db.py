@@ -19,6 +19,10 @@ def write_catalog(tmp):
                     "several", "ode"])
         w.writerow(["stale-tool", "gone-port", "1.0", "exact",
                     "confident", "old", ""])
+        w.writerow(["ansible@12", "py313-ansible", "0.73", "near-hit",
+                    "near-hit", "1 major newer", "py312-ansible"])
+        w.writerow(["stale-near", "gone-port", "0.73", "near-hit",
+                    "near-hit", "old", ""])
     (d / "brew-cask-to-macports.csv").write_text(
         "source,target,confidence,method,status,evidence,alternatives\n")
     return str(d)
@@ -82,6 +86,37 @@ class TestCatalog(unittest.TestCase):
     def test_no_catalog_unchanged(self):
         cs = candidates({"name": "gtk+3", "kind": "formula"}, self.ports)
         self.assertTrue(cs)
+
+    def test_near_hit_offered_not_forced(self):
+        ports = self.ports + [{"name": "py313-ansible"}]
+        cs = candidates({"name": "ansible@12", "kind": "formula"},
+                        ports, catalog=self.cat)
+        self.assertEqual([(c["port"], c["reason"]) for c in cs],
+                         [("py313-ansible", "metamacpkg:near-hit")])
+        # Below the 0.8 auto-install line: offered for review, never
+        # installed without a human decision.
+        from brew2port.core import install
+        plan = make_plan([{"name": "ansible@12", "kind": "formula"}],
+                         ports, catalog=self.cat)
+        self.assertEqual(install(plan)[0]["status"], "needs-review")
+
+    def test_near_hit_preview_lists_port_for_review(self):
+        from brew2port.core import write_preview_csv
+        ports = self.ports + [{"name": "py313-ansible"}]
+        plan = make_plan([{"name": "ansible@12", "kind": "formula"}],
+                         ports, catalog=self.cat)
+        with tempfile.NamedTemporaryFile("r+", suffix=".csv") as f:
+            write_preview_csv(plan, f.name)
+            with open(f.name, newline="") as rf:
+                rows = list(csv.DictReader(rf))
+        self.assertEqual(rows[0]["recommended_port"], "py313-ansible")
+        self.assertEqual(rows[0]["review_status"], "needs-review")
+
+    def test_stale_near_hit_falls_back(self):
+        cs = candidates({"name": "stale-near", "kind": "formula"},
+                        self.ports, catalog=self.cat)
+        self.assertFalse(any(c["reason"].startswith("metamacpkg")
+                             for c in cs))
 
     def test_url_source_and_version(self):
         import tempfile

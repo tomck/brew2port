@@ -9,6 +9,9 @@ Rules:
     -> that single candidate (reason "metamacpkg:<method>").
   * catalog row `confident` but target absent locally
     -> ignored (catalog stale); falls back to local matching.
+  * catalog row `near-hit` + target present locally -> that single
+    candidate (reason "metamacpkg:near-hit"). Near-hit confidence caps
+    at 0.78, so it is always offered for review and never auto-installed.
   * catalog row `missing` -> no candidates at all. This is the point:
     git-svn must NOT fuzzy-match to gitsign, muse-code must NOT match
     mmencode, node must NOT match ode.
@@ -79,6 +82,19 @@ def lookup(catalog, kind, name, port_names):
         return None
     if row.get("status") == "missing":
         return []
+    if row.get("status") == "near-hit" and row.get("target"):
+        try:
+            conf = float(row.get("confidence") or 0)
+        except ValueError:
+            return None
+        if conf >= CONFIDENT_MIN:
+            return None  # not a real near-hit; do not trust blindly
+        if row["target"] not in port_names:
+            return None  # stale catalog entry; do not trust blindly
+        return [{"port": row["target"],
+                 "confidence": conf,
+                 "reason": f"metamacpkg:{row.get('method', 'near-hit')}",
+                 "catalog_version": row.get("catalog_version", "")}]
     if row.get("status") == "confident" and row.get("target"):
         try:
             if float(row.get("confidence") or 0) < CONFIDENT_MIN:
