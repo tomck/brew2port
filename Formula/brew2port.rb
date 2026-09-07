@@ -6,7 +6,7 @@ class Brew2port < Formula
   sha256 "8ee91a4515a710fbc8af2e0b2b90ae0001af0d6394db681f1ae5413c03cf542c"
   license "MIT"
   depends_on "python@3.14"
-  depends_on "macpkgmap"
+  depends_on "tomck/escapefrombrewyork/macpkgmap"
 
 def install
   libexec.install "brew2port"
