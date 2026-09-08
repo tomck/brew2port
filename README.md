@@ -6,7 +6,7 @@ Conservative Homebrew → MacPorts migration planner for Intel and Apple-silicon
 
 For the Homebrew tap, use `brew tap tomck/escapefrombrewyork`; this repository contains the application source, while the tap formula lives in the `escapefrombrewyork` tap alongside `macpkgmap` and `brew2fink`.
 
-The one-stop preparation workflow is `brew2port prepare`. It ensures MacPorts is present, refreshes its local PortIndex, inventories Homebrew, generates `migration-plan.json`, and writes `migration-preview.csv` for review. It does not install any migrated ports. After reviewing the CSV, run `brew2port migrate --plan migration-plan.json --install`; that command asks for confirmation, while `--yes` enables unattended execution.
+The one-stop preparation workflow is `brew2port prepare`. It ensures MacPorts is present, refreshes its local PortIndex, inventories Homebrew, generates `migration-plan.json`, and writes `migration-preview.csv` for review. It does not install any migrated ports. After reviewing the CSV, run `brew2port migrate --plan migration-plan.json --install`; that command asks for confirmation, while `--yes` enables unattended execution. Migration modes are selectable with `--mode`: `trusted` installs only confidence-1 curated/trusted relations, `near-hit` additionally permits catalog near-hits such as version-family matches, `exact` permits only same-name targets, and `interactive` asks per package. Trusted and near-hit modes offer to continue with remaining packages interactively; abandoning them records those packages as intentionally retained.
 
 If MacPorts is not installed, bootstrap it explicitly with `brew2port setup-macports`. This detects the macOS release, downloads the matching official installer, validates its checksum when the release provides one, validates the package signature, asks for administrator authorization, and verifies `/opt/local/bin/port` afterward. Use `--dry-run` to inspect the selected installer without changing the system, or `--skip-update` to omit the post-install `port selfupdate`.
 
@@ -18,7 +18,8 @@ To refresh an existing MacPorts installation independently, run `brew2port updat
 python3 -m brew2port inventory --output brew-inventory.json
 python3 -m brew2port plan --inventory brew-inventory.json --output migration-plan.json
 python3 -m brew2port plan --inventory brew-inventory.json --format text
-python3 -m brew2port migrate --plan migration-plan.json --install
+python3 -m brew2port migrate --plan migration-plan.json --mode trusted --install
+python3 -m brew2port migrate --plan migration-plan.json --mode interactive --install
 python3 -m brew2port verify --plan migration-plan.json
 ```
 

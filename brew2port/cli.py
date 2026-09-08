@@ -27,7 +27,7 @@ def main():
  a=s.add_parser('build-definitions'); a.add_argument('-o','--output',required=True); a.add_argument('--formulae-url',default='https://formulae.brew.sh/api/formula.json'); a.add_argument('--casks-url',default='https://formulae.brew.sh/api/cask.json'); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--overrides')
  a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--catalog-snapshot',default=DEFAULT_SNAPSHOT_CACHE); a.add_argument('--catalog-url',default=DEFAULT_SNAPSHOT_URL); a.add_argument('--update-macports',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--catalog-snapshot',default=DEFAULT_SNAPSHOT_CACHE); a.add_argument('--catalog-url',default=DEFAULT_SNAPSHOT_URL); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
- a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
+ a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('--mode',choices=['trusted','near-hit','exact','interactive'],default='trusted'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
  x=p.parse_args()
  if x.cmd is None and x.update_macports_global:
@@ -69,7 +69,8 @@ Safe workflow:
        brew2port migrate --plan migration-plan.json
 
   7. Apply only after reviewing the preview:
-       brew2port migrate --plan migration-plan.json --install
+       brew2port migrate --plan migration-plan.json --mode trusted --install
+     Other modes: --mode near-hit, --mode exact, or --mode interactive.
 
   8. Verify the resulting MacPorts installations:
        brew2port verify --plan migration-plan.json
@@ -156,7 +157,17 @@ Homebrew packages are never removed automatically.
   install_now=x.install
   if x.install and not x.yes:
    install_now=input('Apply the reviewed migration plan now? [y/N] ').strip().lower() in ('y','yes')
-  data=install(json.load(open(x.plan)),install_now); out=json.dumps(data,indent=2)
+  plan_data=json.load(open(x.plan)); data=install(plan_data,install_now,mode=x.mode)
+  if install_now and x.mode in {'trusted','near-hit'}:
+   remaining=[row for row,result in zip(plan_data,data) if result.get('status')=='needs-review']
+   if remaining:
+    data=[result for result in data if result.get('status')!='needs-review']
+    answer=input(f'{len(remaining)} packages remain for review. Continue interactively? [y/N] ').strip().lower()
+    if answer in ('y','yes'): data.extend(install(remaining,True,mode='interactive'))
+    else:
+     for row in remaining:
+      data.append({**row,'status':'intentionally-retained','reason':'migration abandoned before interactive review'})
+  out=json.dumps(data,indent=2)
   if x.install and not install_now: out += "\n\nInstallation cancelled. No packages were changed.\n"
   if not x.install: out += "\n\nDry run complete. No packages were changed.\n\nTo perform the reviewed installation:\n  brew2port migrate --plan " + x.plan + " --install\n"
  else:

@@ -1,4 +1,4 @@
-import csv, json, re, subprocess, difflib, urllib.request
+import csv, json, re, subprocess, difflib, urllib.request, sys
 from urllib.parse import urljoin
 from pathlib import Path
 import shutil
@@ -134,23 +134,82 @@ def write_preview_csv(plan, path):
             alternatives='; '.join(c.get('port') or c.get('target',{}).get('native_name','') for c in choices[1:])
             writer.writerow([row.get('kind',''),row.get('homebrew',''),port,confidence,reason,alternatives,'recommended' if confident else 'needs-review'])
 
-def install(plan, yes=False, run=subprocess.run, log=None, target_check=target_exists):
-    results=[]
+def _candidate_port(candidate):
+    return candidate.get('port') or candidate.get('target',{}).get('native_name') or candidate.get('name')
+
+def _catalog_candidate(row):
+    recommendation=row.get('recommendation') or {}
+    if recommendation and recommendation.get('relation_type') not in {'no-equivalent','conflicts'}:
+        return recommendation
+    choices=row.get('candidates',[])
+    return choices[0] if choices else None
+
+def _eligible(row, mode):
+    candidate=_catalog_candidate(row)
+    if not candidate or candidate.get('relation_type') in {'no-equivalent','conflicts'}: return None
+    confidence=float(candidate.get('confidence',0))
+    if mode=='automatic':
+        return candidate if row.get('catalog_status','automatic')=='automatic' and confidence>=.8 and (len(row.get('candidates',[]))==1 or confidence-float(row['candidates'][1].get('confidence',0))>=.08) else None
+    if mode=='trusted':
+        evidence=row.get('evidence') or candidate.get('evidence') or []
+        methods={'trusted','curated'}
+        trusted= candidate.get('matching_method') in methods or any(e.get('kind') in methods for e in evidence if isinstance(e,dict))
+        return candidate if confidence==1.0 and trusted else None
+    if mode=='near-hit': return candidate if confidence>=.78 and candidate.get('relation_type') else None
+    if mode=='exact':
+        return candidate if _candidate_port_name(row)==_candidate_port(candidate) else None
+    return candidate
+
+def _candidate_port_name(row):
+    return row.get('source_package') or row.get('homebrew','')
+
+def _verify_port(port, run):
+    result=run(['port','installed',port],capture_output=True,text=True,check=False)
+    return result.returncode==0 and port in result.stdout
+
+def install(plan, yes=False, run=subprocess.run, log=None, target_check=target_exists,
+            mode='automatic', input_fn=input, unlink=True):
+    """Install selected mappings, verify them, and optionally unlink Homebrew.
+
+    Modes are trusted, near-hit, exact, and interactive. Without ``yes`` this
+    remains a pure dry run. Homebrew is never uninstalled or overwritten.
+    """
+    if mode not in {'automatic','trusted','near-hit','exact','interactive'}:
+        raise ValueError('mode must be trusted, near-hit, exact, or interactive')
+    results=[]; remaining=[]
     for row in plan:
-        if row.get('recommendation'):
-            shared=row
-            relation_type=row['recommendation'].get('relation_type')
-            chosen=row['recommendation'] if relation_type not in {'no-equivalent','conflicts'} and install_allowed(shared) else None
-        else:
-            cs=row['candidates']; chosen=cs[0] if cs and cs[0].get('relation_type') not in {'no-equivalent','conflicts'} and row.get('catalog_status','automatic')=='automatic' and cs[0]['confidence']>=.8 and (len(cs)==1 or cs[0]['confidence']-cs[1]['confidence']>=.08) else None
-        if not chosen: results.append({**row,'status':'needs-review'}); continue
-        port=chosen.get('port') or chosen.get('target',{}).get('native_name') or chosen.get('name')
-        cmd=['sudo','port','install',port]
-        if not yes: results.append({**row,'status':'dry-run','command':cmd}); continue
+        chosen=_eligible(row,mode) if mode!='interactive' else None
+        unlink_choice=unlink
+        if mode=='interactive':
+            choices=row.get('candidates',[])
+            if not choices:
+                results.append({**row,'status':'needs-review'}); continue
+            print(f"{row['homebrew']}: choose 1=install and unlink, 2=install and keep linked, 3=skip",file=sys.stderr)
+            for number,candidate in enumerate(choices,1): print(f"  {number}: {_candidate_port(candidate)} ({candidate.get('confidence','?')})",file=sys.stderr)
+            answer=input_fn('Choice [1/2/3, default 1]: ').strip() or '1'
+            if answer=='3': results.append({**row,'status':'intentionally-retained'}); continue
+            if answer not in {'1','2'}: results.append({**row,'status':'needs-review','reason':'invalid interactive choice'}); continue
+            chosen=choices[0]; unlink_choice=answer=='1'
+        if not chosen:
+            remaining.append(row); results.append({**row,'status':'needs-review'}); continue
+        port=_candidate_port(chosen); cmd=['sudo','port','install',port]
+        result={**row,'status':'dry-run' if not yes else 'pending','command':cmd}
+        if not yes:
+            if unlink_choice: result['follow_up']=['port installed '+port,'brew unlink '+row['homebrew']]
+            results.append(result); continue
         if not target_check(port,run=run):
-            results.append({**row,'status':'target-missing','command':cmd,'reason':'MacPorts target is absent from the local PortIndex'})
-            continue
-        r=run(cmd); results.append({**row,'status':'installed' if r.returncode==0 else 'failed','command':cmd})
+            results.append({**result,'status':'target-missing','reason':'MacPorts target is absent from the local PortIndex'}); continue
+        installed=run(cmd)
+        if installed.returncode != 0:
+            results.append({**result,'status':'failed'}); continue
+        if not _verify_port(port,run):
+            results.append({**result,'status':'verification-failed','reason':'MacPorts did not report the port as installed'}); continue
+        if unlink_choice:
+            unlinked=run(['brew','unlink',row['homebrew']])
+            result['status']='installed-and-unlinked' if unlinked.returncode==0 else 'installed-unlink-failed'
+            result['unlink_command']=['brew','unlink',row['homebrew']]
+        else: result['status']='installed'
+        results.append(result)
     return results
 
 def verify_plan(plan, run=subprocess.run):

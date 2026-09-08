@@ -56,6 +56,37 @@ class TestCore(unittest.TestCase):
   self.assertEqual(result[0]['status'],'target-missing')
   self.assertEqual(calls,[])
 
+ def test_trusted_install_verifies_before_unlinking(self):
+  plan=[{'homebrew':'wget','candidates':[{'port':'wget','relation_type':'equivalent','confidence':1.0,'matching_method':'curated','evidence':[{'kind':'curated'}]}]}]
+  calls=[]
+  def run(args,**kwargs):
+   calls.append(args)
+   return type('R',(),{'returncode':0,'stdout':'wget 1.0\n','stderr':''})()
+  result=install(plan,yes=True,mode='trusted',run=run,target_check=lambda port,run: True)
+  self.assertEqual(result[0]['status'],'installed-and-unlinked')
+  self.assertEqual(calls,[['sudo','port','install','wget'],['port','installed','wget'],['brew','unlink','wget']])
+
+ def test_near_hit_mode_allows_version_family_but_exact_mode_does_not(self):
+  plan=[{'homebrew':'python@3.14','candidates':[{'target':{'native_name':'python314'},'relation_type':'equivalent','confidence':.78,'matching_method':'version-family'}]}]
+  self.assertEqual(install(plan,mode='near-hit')[0]['status'],'dry-run')
+  self.assertEqual(install(plan,mode='exact')[0]['status'],'needs-review')
+
+ def test_interactive_choice_two_keeps_homebrew_linked(self):
+  plan=[{'homebrew':'wget','candidates':[{'port':'wget','confidence':1.0,'reason':'exact name'}]}]
+  calls=[]
+  def run(args,**kwargs):
+   calls.append(args); return type('R',(),{'returncode':0,'stdout':'wget 1.0\n','stderr':''})()
+  result=install(plan,yes=True,mode='interactive',input_fn=lambda prompt:'2',run=run,target_check=lambda port,run: True)
+  self.assertEqual(result[0]['status'],'installed')
+  self.assertEqual(calls,[['sudo','port','install','wget'],['port','installed','wget']])
+
+ def test_dry_run_has_no_side_effects(self):
+  plan=[{'homebrew':'wget','candidates':[{'port':'wget','confidence':1.0,'matching_method':'curated'}]}]
+  calls=[]
+  result=install(plan,mode='trusted',run=lambda *args,**kwargs: calls.append(args))
+  self.assertEqual(result[0]['status'],'dry-run')
+  self.assertEqual(calls,[])
+
  def test_automatic_negative_relation_is_not_installable(self):
   plan=[{'homebrew':'macs-fan-control','recommendation':{'target':{'manager':'macports','package_type':'port','native_name':'qmail-spamcontrol'},'relation_type':'no-equivalent','review_status':'automatic','confidence':1.0},'install_authorized':True,'candidates':[]}]
   result=install(plan,yes=True,run=lambda *args,**kwargs: (_ for _ in ()).throw(AssertionError('install must not run')))
