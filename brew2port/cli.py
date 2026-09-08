@@ -4,7 +4,7 @@ from .definitions import (DEFAULT_DEFINITIONS_CACHE, DEFAULT_DEFINITIONS_URL,
                           build_definitions_from_urls, fetch_definitions,
                           load_definitions)
 from .macports import setup_macports
-from .catalog import definitions_for
+from .catalog import DEFAULT_SNAPSHOT_CACHE, DEFAULT_SNAPSHOT_URL, definitions_for
 
 def plan_progress(number,total,name):
  width=32; complete=int(width*number/total) if total else width
@@ -25,8 +25,8 @@ def main():
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  s.add_parser('update-macports')
  a=s.add_parser('build-definitions'); a.add_argument('-o','--output',required=True); a.add_argument('--formulae-url',default='https://formulae.brew.sh/api/formula.json'); a.add_argument('--casks-url',default='https://formulae.brew.sh/api/cask.json'); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--overrides')
- a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
- a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
+ a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--catalog-snapshot',default=DEFAULT_SNAPSHOT_CACHE); a.add_argument('--catalog-url',default=DEFAULT_SNAPSHOT_URL); a.add_argument('--update-macports',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
+ a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--catalog-snapshot',default=DEFAULT_SNAPSHOT_CACHE); a.add_argument('--catalog-url',default=DEFAULT_SNAPSHOT_URL); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('-o','--output')
  a=s.add_parser('verify'); a.add_argument('--plan',required=True)
  x=p.parse_args()
@@ -40,10 +40,12 @@ Safe workflow:
   1. Inventory explicitly requested Homebrew packages:
        brew2port inventory --output brew-inventory.json
 
- 2. brew2port queries the installed `macpkgmap` catalog client for known mappings.
+  2. brew2port queries the installed `macpkgmap` catalog client for known mappings.
      Anything not covered there uses MacPorts' local PortIndex automatically when
      `port` is installed. Install the catalog client with:
        brew tap tomck/escapefrombrewyork && brew install macpkgmap
+     The published catalog snapshot is downloaded once to
+     ~/.cache/brew2port/catalog.json and reused for offline dry-runs.
      Use --update-macports to refresh the local PortIndex first, or --ports FILE
      with plan for an offline/local snapshot.
 
@@ -107,7 +109,7 @@ Homebrew packages are never removed automatically.
   print(f'Writing Homebrew inventory to {x.inventory_output}...',file=sys.stderr)
   items=inventory_from_brew(); open(x.inventory_output,'w').write(json.dumps(items,indent=2)+'\n')
   ov=json.load(open(x.overrides)) if x.overrides else {}
-  defs=definitions_for(items,x.catalog_command,progress=progress_message)
+  defs=definitions_for(items,x.catalog_command,progress=progress_message,snapshot=x.catalog_snapshot,snapshot_url=x.catalog_url)
   known=sum(bool(defs.get((item['kind'],item['name']),{}).get('candidates') or defs.get((item['kind'],item['name']),{}).get('negative_relation')) for item in items)
   print(f'Definitions database covers {known} of {len(items)} installed packages.',file=sys.stderr)
   ports=[]
@@ -126,7 +128,7 @@ Homebrew packages are never removed automatically.
    try: ov=json.load(open(x.overrides))
    except FileNotFoundError: p.error(f"overrides file not found: {x.overrides} (omit --overrides or use an absolute path)")
   else: ov={}
-  defs=definitions_for(items,x.catalog_command,progress=progress_message)
+  defs=definitions_for(items,x.catalog_command,progress=progress_message,snapshot=x.catalog_snapshot,snapshot_url=x.catalog_url)
   known=sum(bool(defs.get((item['kind'],item['name']),{}).get('candidates') or defs.get((item['kind'],item['name']),{}).get('negative_relation')) for item in items)
   print(f'Definitions database covers {known} of {len(items)} packages.',file=sys.stderr)
   if x.ports:
@@ -145,7 +147,11 @@ Homebrew packages are never removed automatically.
   print(f'Matching {len(items)-known} packages not covered by definitions against {len(ports)} MacPorts ports...',file=sys.stderr)
   data=make_plan(items,ports,ov,definitions=defs,progress=plan_progress)
   print(f'Generated migration plan for {len(data)} packages.',file=sys.stderr)
-  out=json.dumps(data,indent=2) if x.format=='json' else '\n'.join(f"{r['homebrew']} -> "+(', '.join(f"{c['port']} ({c['confidence']})" for c in r['candidates']) or 'NO MATCH') for r in data)
+  if x.format=='json': out=json.dumps(data,indent=2)
+  else:
+   def candidate_label(candidate):
+    return f"{candidate.get('port') or candidate.get('target',{}).get('native_name','?')} ({candidate.get('confidence','?')})"
+   out='\n'.join(f"{r['homebrew']} -> "+(', '.join(candidate_label(c) for c in r.get('candidates',[])) or 'NO MATCH') for r in data)
  elif x.cmd=='migrate':
   install_now=x.install
   if x.install and not x.yes:
