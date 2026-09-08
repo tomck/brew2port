@@ -37,7 +37,7 @@ def main():
 
 Safe workflow:
 
-  1. Inventory explicitly installed Homebrew packages:
+  1. Inventory explicitly requested Homebrew packages:
        brew2port inventory --output brew-inventory.json
 
  2. brew2port queries the installed `macpkgmap` catalog client for known mappings.
@@ -47,10 +47,11 @@ Safe workflow:
      Use --update-macports to refresh the local PortIndex first, or --ports FILE
      with plan for an offline/local snapshot.
 
-  3. One-stop preparation (installs/updates MacPorts, inventories Homebrew,
+  3. One-stop preparation (checks MacPorts, inventories Homebrew,
      creates a plan, and writes a CSV review file):
-       brew2port prepare
-     It does not install migrated ports. After reviewing the CSV, run:
+     brew2port prepare
+     It writes migration-plan.json and migration-preview.csv, and does not
+     install migrated ports. After reviewing the CSV, run:
        brew2port migrate --plan migration-plan.json --install
 
   4. If MacPorts is not installed, bootstrap it explicitly:
@@ -58,15 +59,18 @@ Safe workflow:
      To update an existing MacPorts installation independently:
        brew2port update-macports
 
-  5. Generate and review a migration plan:
+  5. Generate and review a migration plan when customizing the prepared files:
        brew2port plan --inventory brew-inventory.json \\
          --output migration-plan.json
 
   6. Preview the migration (dry run):
        brew2port migrate --plan migration-plan.json
 
-  7. Install only after reviewing the preview:
+  7. Apply only after reviewing the preview:
        brew2port migrate --plan migration-plan.json --install
+
+  8. Verify the resulting MacPorts installations:
+       brew2port verify --plan migration-plan.json
 
 Homebrew packages are never removed automatically.
 """)
