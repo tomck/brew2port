@@ -153,7 +153,8 @@ def _eligible(row, mode):
     if mode=='trusted':
         evidence=row.get('evidence') or candidate.get('evidence') or []
         methods={'trusted','curated'}
-        trusted= candidate.get('matching_method') in methods or any(e.get('kind') in methods for e in evidence if isinstance(e,dict))
+        trusted_method=candidate.get('matching_method') or candidate.get('method')
+        trusted= trusted_method in methods or any(e.get('kind') in methods for e in evidence if isinstance(e,dict))
         return candidate if confidence==1.0 and trusted else None
     if mode=='near-hit': return candidate if confidence>=.78 and candidate.get('relation_type') else None
     if mode=='exact':

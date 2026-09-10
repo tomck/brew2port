@@ -66,6 +66,11 @@ class TestCore(unittest.TestCase):
   self.assertEqual(result[0]['status'],'installed-and-unlinked')
   self.assertEqual(calls,[['sudo','port','install','wget'],['port','installed','wget'],['brew','unlink','wget']])
 
+ def test_trusted_mode_accepts_catalog_recommendation_method(self):
+  plan=[{'homebrew':'node','recommendation':{'target':{'native_name':'nodejs26'},'relation_type':'equivalent','confidence':1.0,'method':'curated','review_status':'automatic'},'install_authorized':True}]
+  result=install(plan,mode='trusted')
+  self.assertEqual(result[0]['status'],'dry-run')
+
  def test_near_hit_mode_allows_version_family_but_exact_mode_does_not(self):
   plan=[{'homebrew':'python@3.14','candidates':[{'target':{'native_name':'python314'},'relation_type':'equivalent','confidence':.78,'matching_method':'version-family'}]}]
   self.assertEqual(install(plan,mode='near-hit')[0]['status'],'dry-run')
