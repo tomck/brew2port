@@ -193,6 +193,10 @@ def install(plan, yes=False, run=subprocess.run, log=None, target_check=target_e
             chosen=choices[0]; unlink_choice=answer=='1'
         if not chosen:
             remaining.append(row); results.append({**row,'status':'needs-review'}); continue
+        if yes and mode=='near-hit' and (chosen.get('review_status') or row.get('catalog_status') or 'needs-review')!='automatic':
+            print(f"{row['homebrew']}: install near-hit {_candidate_port(chosen)} ({chosen.get('confidence','?')})?",file=sys.stderr)
+            if input_fn('Install this near-hit? [y/N]: ').strip().lower() not in ('y','yes'):
+                results.append({**row,'status':'intentionally-retained','reason':'near-hit declined at per-package confirmation'}); continue
         port=_candidate_port(chosen); cmd=['sudo','port','install',port]
         result={**row,'status':'dry-run' if not yes else 'pending','command':cmd}
         if not yes:

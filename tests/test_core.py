@@ -107,3 +107,29 @@ class TestCore(unittest.TestCase):
   result=make_plan([{'kind':'cask','name':'macs-fan-control'}],[{'name':'qmail-spamcontrol'}],definitions=definitions)
   self.assertEqual(result[0]['candidates'],[])
   self.assertEqual(result[0]['catalog_status'],'no-equivalent')
+ def test_near_hit_review_candidate_needs_per_package_confirmation(self):
+  plan=[{'homebrew':'ansible@12','candidates':[{'target':{'native_name':'py313-ansible'},'relation_type':'equivalent','confidence':.78,'review_status':'needs-review','matching_method':'version-family'}]}]
+  calls=[]
+  def run(*args,**kwargs): calls.append(args); return type('R',(),{'returncode':0,'stdout':'py313-ansible 1.0\n','stderr':''})()
+  result=install(plan,yes=True,mode='near-hit',input_fn=lambda prompt:'n',run=run,target_check=lambda port,run: True)
+  self.assertEqual(result[0]['status'],'intentionally-retained')
+  self.assertEqual(calls,[])
+ def test_near_hit_confirmed_review_candidate_installs(self):
+  plan=[{'homebrew':'ansible@12','candidates':[{'target':{'native_name':'py313-ansible'},'relation_type':'equivalent','confidence':.78,'review_status':'needs-review','matching_method':'version-family'}]}]
+  calls=[]
+  def run(args,**kwargs):
+   calls.append(args); return type('R',(),{'returncode':0,'stdout':'py313-ansible 1.0\n','stderr':''})()
+  result=install(plan,yes=True,mode='near-hit',input_fn=lambda prompt:'y',run=run,target_check=lambda port,run: True,unlink=False)
+  self.assertEqual(result[0]['status'],'installed')
+  self.assertEqual(calls[0],['sudo','port','install','py313-ansible'])
+ def test_near_hit_automatic_candidate_needs_no_confirmation(self):
+  plan=[{'homebrew':'node','recommendation':{'target':{'native_name':'nodejs26'},'relation_type':'equivalent','confidence':1.0,'method':'curated','review_status':'automatic'},'install_authorized':True}]
+  def run(args,**kwargs): return type('R',(),{'returncode':0,'stdout':'nodejs26 1.0\n','stderr':''})()
+  def ask(prompt): raise AssertionError('automatic install must not prompt')
+  result=install(plan,yes=True,mode='near-hit',input_fn=ask,run=run,target_check=lambda port,run: True,unlink=False)
+  self.assertEqual(result[0]['status'],'installed')
+ def test_near_hit_dry_run_never_prompts(self):
+  plan=[{'homebrew':'ansible@12','candidates':[{'target':{'native_name':'py313-ansible'},'relation_type':'equivalent','confidence':.78,'review_status':'needs-review','matching_method':'version-family'}]}]
+  def ask(prompt): raise AssertionError('dry run must not prompt')
+  result=install(plan,mode='near-hit',input_fn=ask,run=lambda *args,**kwargs: (_ for _ in ()).throw(AssertionError('dry run must not execute')))
+  self.assertEqual(result[0]['status'],'dry-run')

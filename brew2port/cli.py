@@ -162,7 +162,8 @@ Homebrew packages are never removed automatically.
    remaining=[row for row,result in zip(plan_data,data) if result.get('status')=='needs-review']
    if remaining:
     data=[result for result in data if result.get('status')!='needs-review']
-    answer=input(f'{len(remaining)} packages remain for review. Continue interactively? [y/N] ').strip().lower()
+    if x.yes: answer='n'
+    else: answer=input(f'{len(remaining)} packages remain for review. Continue interactively? [y/N] ').strip().lower()
     if answer in ('y','yes'): data.extend(install(remaining,True,mode='interactive'))
     else:
      for row in remaining:
