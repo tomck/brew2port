@@ -1,8 +1,5 @@
 import argparse,json,urllib.request,logging,sys,subprocess,shutil
 from .core import *
-from .definitions import (DEFAULT_DEFINITIONS_CACHE, DEFAULT_DEFINITIONS_URL,
-                          build_definitions_from_urls, fetch_definitions,
-                          load_definitions)
 from .macports import setup_macports
 from .catalog import DEFAULT_SNAPSHOT_CACHE, DEFAULT_SNAPSHOT_URL, definitions_for
 
@@ -24,7 +21,6 @@ def main():
  a=s.add_parser('build-index'); a.add_argument('-o','--output',required=True); a.add_argument('--url',default='https://ports.macports.org/api/v1/ports/')
  a=s.add_parser('setup-macports'); a.add_argument('--version'); a.add_argument('--dry-run',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  s.add_parser('update-macports')
- a=s.add_parser('build-definitions'); a.add_argument('-o','--output',required=True); a.add_argument('--formulae-url',default='https://formulae.brew.sh/api/formula.json'); a.add_argument('--casks-url',default='https://formulae.brew.sh/api/cask.json'); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--overrides')
  a=s.add_parser('prepare'); a.add_argument('--inventory-output',default='brew-inventory.json'); a.add_argument('--plan-output',default='migration-plan.json'); a.add_argument('--preview-output',default='migration-preview.csv'); a.add_argument('--overrides'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--catalog-snapshot',default=DEFAULT_SNAPSHOT_CACHE); a.add_argument('--catalog-url',default=DEFAULT_SNAPSHOT_URL); a.add_argument('--update-macports',action='store_true'); a.add_argument('--skip-update',action='store_true'); a.add_argument('--yes',action='store_true')
  a=s.add_parser('plan'); a.add_argument('--inventory',required=True); a.add_argument('--ports'); a.add_argument('--ports-url',default='https://ports.macports.org/api/v1/ports/'); a.add_argument('--cache',default='~/.cache/brew2port/macports-ports.json'); a.add_argument('--catalog-command',default='macpkgmap'); a.add_argument('--catalog-snapshot',default=DEFAULT_SNAPSHOT_CACHE); a.add_argument('--catalog-url',default=DEFAULT_SNAPSHOT_URL); a.add_argument('--refresh-ports',action='store_true'); a.add_argument('--update-macports',action='store_true'); a.add_argument('--overrides'); a.add_argument('-o','--output'); a.add_argument('--format',choices=['json','text'],default='json')
  a=s.add_parser('migrate'); a.add_argument('--plan',required=True); a.add_argument('--install',action='store_true'); a.add_argument('--yes',action='store_true'); a.add_argument('--mode',choices=['trusted','near-hit','exact','interactive'],default='trusted'); a.add_argument('-o','--output')
@@ -81,20 +77,6 @@ Homebrew packages are never removed automatically.
  if x.cmd=='inventory': data=inventory_from_brew(); out=json.dumps(data,indent=2)
  elif x.cmd=='build-index':
   data=fetch_macports_ports(x.url); out=json.dumps(data,indent=2)
- elif x.cmd=='build-definitions':
-  print('Downloading current Homebrew formula and cask metadata...',file=sys.stderr)
-  ov=json.load(open(x.overrides)) if x.overrides else {}
-  if x.ports:
-   print(f'Loading MacPorts catalog from {x.ports}...',file=sys.stderr)
-   from .definitions import fetch_json
-   formulae=fetch_json(x.formulae_url); casks=fetch_json(x.casks_url); ports=load_ports(x.ports)
-   data=__import__('brew2port.definitions',fromlist=['build_definitions']).build_definitions(formulae,casks,ports,ov)
-  else:
-   print('Downloading/currently refreshing the MacPorts catalog...',file=sys.stderr)
-   data=build_definitions_from_urls(x.formulae_url,x.casks_url,x.ports_url,x.cache,x.refresh_ports,ov,progress=progress_message)
-  open(x.output,'w').write(json.dumps(data,indent=2)+'\n')
-  print(f"Published definitions contain {data['mapping_count']} trusted mappings.",file=sys.stderr)
-  out=f'Wrote definitions database to {x.output}'
  elif x.cmd=='setup-macports':
   data=setup_macports(x.version,x.dry_run,x.skip_update,x.yes); out=json.dumps(data,indent=2)
  elif x.cmd=='update-macports':
